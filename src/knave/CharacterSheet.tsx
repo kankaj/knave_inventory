@@ -14,9 +14,14 @@ import './sheet.css'
 export type CharacterSheetProps = {
   character: Character
   onChange: (next: Character) => void
+  portraitEditable?: boolean
 }
 
-export function CharacterSheet({ character, onChange }: CharacterSheetProps) {
+export function CharacterSheet({
+  character,
+  onChange,
+  portraitEditable = true,
+}: CharacterSheetProps) {
   const patch = (changes: Partial<Character>) =>
     onChange({ ...character, ...changes })
 
@@ -90,7 +95,11 @@ export function CharacterSheet({ character, onChange }: CharacterSheetProps) {
         <PortraitFrame
           src={character.portrait}
           alt={character.name}
-          onSelect={(portrait) => patch({ portrait })}
+          onUrlChange={
+            portraitEditable
+              ? (portrait) => patch({ portrait: portrait || undefined })
+              : undefined
+          }
         />
       </div>
 

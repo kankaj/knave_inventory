@@ -93,13 +93,24 @@ export const Ribbon: Story = {
   },
 }
 
+function PortraitHarness() {
+  const [url, setUrl] = useState('')
+  return <PortraitFrame src={url} onUrlChange={setUrl} />
+}
+
 export const PortraitEmpty: Story = {
-  render: () => <PortraitFrame onSelect={() => {}} />,
+  render: () => <PortraitHarness />,
   play: async ({ canvas }) => {
-    await expect(canvas.getByText('Vyber obrázek')).toBeVisible()
+    await expect(canvas.getByText('Vlož odkaz na obrázek')).toBeVisible()
+    const field = canvas.getByLabelText('Odkaz na portrét')
+    await userEvent.type(field, 'https://example.test/jarmila.png')
+    await expect(field).toHaveValue('https://example.test/jarmila.png')
   },
 }
 
 export const PortraitReadOnly: Story = {
   render: () => <PortraitFrame />,
+  play: async ({ canvas }) => {
+    await expect(canvas.getByText('Bez portrétu')).toBeVisible()
+  },
 }

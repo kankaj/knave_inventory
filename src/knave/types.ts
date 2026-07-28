@@ -95,6 +95,94 @@ export function createCharacter(overrides: Partial<Character> = {}): Character {
 }
 
 /**
+ * A stored sheet plus who it belongs to. The id is generated once and never
+ * changes; Owlbear player ids are per-connection, so keying profiles by them
+ * would orphan every sheet the next time the table meets.
+ */
+export type Profile = {
+  id: string
+  /** Owlbear player id of the current owner, empty when nobody is claiming. */
+  ownerId: string
+  /** Last known name of the owner, used to re-find a sheet from a new device. */
+  ownerName: string
+  character: Character
+}
+
+export function createProfile(overrides: Partial<Profile> = {}): Profile {
+  return {
+    id: newProfileId(),
+    ownerId: '',
+    ownerName: '',
+    character: createCharacter({ name: overrides.ownerName ?? '' }),
+    ...overrides,
+  }
+}
+
+function newProfileId(): string {
+  if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
+    return crypto.randomUUID()
+  }
+  return `p${Math.abs(Date.now() ^ (performance.now() * 1000)).toString(36)}`
+}
+
+export function normalizeProfile(raw: unknown, fallbackId: string): Profile {
+  const input =
+    raw && typeof raw === 'object' ? (raw as Partial<Profile>) : undefined
+  return {
+    id: typeof input?.id === 'string' && input.id ? input.id : fallbackId,
+    ownerId: typeof input?.ownerId === 'string' ? input.ownerId : '',
+    ownerName: typeof input?.ownerName === 'string' ? input.ownerName : '',
+    character: normalizeCharacter(input?.character),
+  }
+}
+
+/**
+ * Rebuild a character from whatever the room metadata holds. Anything shared
+ * over the network can be stale, hand-edited, or written by an older version
+ * of this extension, and a missing slots array would break rendering.
+ */
+export function normalizeCharacter(raw: unknown): Character {
+  const base = createCharacter()
+  if (!raw || typeof raw !== 'object') return base
+  const input = raw as Partial<Character>
+
+  const slots = Array.isArray(input.slots) ? input.slots : []
+  const abilities = { ...base.abilities }
+  if (input.abilities && typeof input.abilities === 'object') {
+    for (const key of Object.keys(abilities) as AbilityKey[]) {
+      const value = input.abilities[key]
+      if (typeof value === 'number' && Number.isFinite(value)) {
+        abilities[key] = value
+      }
+    }
+  }
+
+  const max = number(input.hp?.max, base.hp.max)
+  return {
+    name: text(input.name),
+    career: text(input.career),
+    level: number(input.level, base.level),
+    xp: number(input.xp, base.xp),
+    armorClass: number(input.armorClass, base.armorClass),
+    armorBonus: number(input.armorBonus, base.armorBonus),
+    hp: { max, current: Math.min(number(input.hp?.current, max), max) },
+    abilities,
+    slots: Array.from({ length: SLOT_COUNT }, (_, index) =>
+      typeof slots[index] === 'string' ? slots[index] : '',
+    ),
+    portrait: typeof input.portrait === 'string' ? input.portrait : undefined,
+  }
+}
+
+function text(value: unknown): string {
+  return typeof value === 'string' ? value : ''
+}
+
+function number(value: unknown, fallback: number): number {
+  return typeof value === 'number' && Number.isFinite(value) ? value : fallback
+}
+
+/**
  * How many item rows the character can actually use. Odolnost is the ability
  * that governs "řádky předmětů" on the sheet, so capacity grows with it.
  * Rows past the capacity are printed but struck through.

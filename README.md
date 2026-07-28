@@ -36,6 +36,45 @@ never fires without a parent Owlbear window.
 | `src/App.tsx`          | Popover UI; waits on `OBR.onReady` before using the SDK |
 | `src/knave/`           | Character sheet components, modelled on the printed sheet |
 
+## How profiles are shared
+
+Each sheet lives in Owlbear **room metadata** under its own key,
+`cz.bigroot.knave-inventory/profile/<profileId>`, where `profileId` is a UUID
+generated once for that sheet. One key per sheet matters: Owlbear merges
+metadata by top-level key, so two people editing two different sheets never
+overwrite each other. A single key holding all profiles would make the last
+writer win.
+
+Room metadata is shared and writable by everyone connected, so every player —
+GM or not — can open and edit every sheet. There is no per-player permission to
+enforce.
+
+### Why profiles are not keyed by player id
+
+Owlbear player ids are per-connection: they change when a player rejoins, so a
+sheet keyed by player id would be orphaned by the next session. Instead a
+profile carries its own id plus `ownerId` (the current player id) and
+`ownerName`. On open, the extension re-attaches you to your sheet in three
+steps:
+
+1. A `localStorage` note (`knave-inventory/room/<roomId>/profile`) remembers
+   which sheet is yours in this room, and reclaims it silently.
+2. Failing that — a new browser or device, or blocked storage — a sheet whose
+   `ownerName` matches your Owlbear name and whose owner is not in the room is
+   claimed automatically.
+3. Failing both, press **Převzít** on any sheet to take it over.
+
+Sheets whose owner has left stay in the tab strip marked *pryč*, and **+ list**
+creates an extra sheet (a familiar, an NPC, a second character).
+
+Keystrokes are batched for 350 ms before writing, and pending local edits win
+over incoming room updates until the room echoes them back. Profiles are read
+through `normalizeProfile`, so a stale or hand-edited metadata entry cannot
+break rendering.
+
+Portraits are stored as an image address, not an upload: an encoded image would
+not fit in shared room metadata.
+
 ## Sheet components
 
 `src/knave/` is a small component set drawn from the Knave 2e sheet. Every
@@ -73,6 +112,22 @@ npm run build    # tsc -b && vite build -> dist/
 npm run preview  # serve dist/ locally
 npm run lint     # oxlint
 ```
+
+## Tests
+
+Two Vitest projects run from one command:
+
+```sh
+npm run test          # watch both projects
+npm run test-run      # single pass, both projects
+npm run test-stories   # Storybook stories in real Chromium
+npm run test-unit      # plain unit tests, no DOM
+```
+
+`storybook` runs every story's `play` function in Chromium through
+`@storybook/addon-vitest`. `unit` covers `src/**/*.test.ts` — the profile
+re-attachment tiers in `src/knave/identity.ts` and the metadata normalizers in
+`src/knave/types.ts`, neither of which needs a browser or a live room.
 
 Deploy `dist/` to any static host, then install the extension from
 `https://<your-host>/manifest.json`.

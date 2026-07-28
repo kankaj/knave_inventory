@@ -39,6 +39,14 @@ export default defineConfig({
           }]
         }
       }
+    }, {
+      // Plain unit tests for logic that needs no DOM.
+      extends: true,
+      test: {
+        name: 'unit',
+        environment: 'node',
+        include: ['src/**/*.test.ts']
+      }
     }]
   }
 });

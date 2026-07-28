@@ -1,4 +1,4 @@
-import { useId, useState, type ChangeEvent } from 'react'
+import { useId, useState } from 'react'
 
 export type NumberInputProps = {
   id?: string
@@ -165,44 +165,56 @@ export function RibbonField({
 export type PortraitFrameProps = {
   src?: string
   alt?: string
-  /** Omit to render a read-only frame. */
-  onSelect?: (dataUrl: string) => void
+  /**
+   * Omit to render a read-only frame. Takes an image address rather than an
+   * upload: the sheet is stored in shared room metadata, which is far too
+   * small to hold an encoded image.
+   */
+  onUrlChange?: (url: string) => void
 }
 
-export function PortraitFrame({ src, alt, onSelect }: PortraitFrameProps) {
+export function PortraitFrame({ src, alt, onUrlChange }: PortraitFrameProps) {
   const id = useId()
-
-  function handleFile(event: ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0]
-    if (!file || !onSelect) return
-    const reader = new FileReader()
-    reader.addEventListener('load', () => {
-      if (typeof reader.result === 'string') onSelect(reader.result)
-    })
-    reader.readAsDataURL(file)
-  }
+  const [broken, setBroken] = useState(false)
+  const showImage = Boolean(src) && !broken
 
   return (
     <div className="k-portrait">
       <span className="k-label">Portrét</span>
       <div className="k-portrait-frame">
-        {src ? (
-          <img className="k-portrait-img" src={src} alt={alt ?? ''} />
-        ) : onSelect ? (
-          <label className="k-portrait-empty" htmlFor={id}>
-            Vyber obrázek
-            <input
-              id={id}
-              type="file"
-              accept="image/*"
-              onChange={handleFile}
-              hidden
-            />
-          </label>
+        {showImage ? (
+          <img
+            className="k-portrait-img"
+            src={src}
+            alt={alt ?? ''}
+            onError={() => setBroken(true)}
+          />
         ) : (
-          <span className="k-portrait-empty">Bez portrétu</span>
+          <span className="k-portrait-empty">
+            {broken
+              ? 'Obrázek se nepodařilo načíst'
+              : onUrlChange
+                ? 'Vlož odkaz na obrázek'
+                : 'Bez portrétu'}
+          </span>
         )}
       </div>
+      {onUrlChange && (
+        <div className="k-field-rule">
+          <input
+            id={id}
+            className="k-input k-portrait-url"
+            type="url"
+            value={src ?? ''}
+            placeholder="https://…"
+            aria-label="Odkaz na portrét"
+            onChange={(event) => {
+              setBroken(false)
+              onUrlChange(event.target.value)
+            }}
+          />
+        </div>
+      )}
     </div>
   )
 }

@@ -10,8 +10,10 @@
     "preview": "vite preview",
     "storybook": "storybook dev -p 6006",
     "build-storybook": "storybook build",
-    "test": "vitest --project=storybook",
-    "test-run": "vitest run --project=storybook"
+    "test": "vitest",
+    "test-run": "vitest run",
+    "test-stories": "vitest run --project=storybook",
+    "test-unit": "vitest run --project=unit"
   },
   "dependencies": {
     "@fontsource/eb-garamond": "^5.3.0",
