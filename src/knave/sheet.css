@@ -224,14 +224,35 @@
   gap: 1px;
   padding-top: 2px;
   min-width: 0;
+  overflow: hidden;
+}
+
+.k-dial-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 1px 7px;
+  min-width: 0;
 }
 
 .k-dial-name {
   display: block;
+  flex: 1 1 auto;
+  min-width: 0;
   font-size: 18px;
   font-weight: 600;
   letter-spacing: 0.02em;
   text-transform: uppercase;
+}
+
+/* Obrana is derived from the bonus, never written down. */
+.k-dial-def {
+  flex: 0 0 auto;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
 }
 
 .k-dial-uses {
@@ -410,7 +431,8 @@
 
 .k-slot {
   display: grid;
-  grid-template-columns: 22px 1fr;
+  /* The send checkbox adds a leading column only while picking. */
+  grid-template-columns: 22px 1fr auto;
   align-items: center;
   gap: 4px;
   padding: 3px 7px 4px;
@@ -431,6 +453,195 @@
 }
 
 .k-slot[data-beyond='true'] .k-slot-index {
+  text-decoration: line-through;
+}
+
+/* ── Wounds and the send picker ────────────────────────────── */
+
+.k-slot[data-picking='true'] {
+  grid-template-columns: auto 22px 1fr auto;
+}
+
+.k-slot-pick {
+  width: 13px;
+  height: 13px;
+  margin: 0;
+  accent-color: var(--ink);
+  cursor: pointer;
+}
+
+.k-slot-pick:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+
+/* A wound is written in a row like an item, but crossed out. */
+.k-slot[data-wound='true'] .k-slot-text,
+.k-slot[data-wound='true'] .k-slot-index {
+  text-decoration: line-through;
+  text-decoration-thickness: 1.5px;
+}
+
+.k-slot[data-wound='true'] .k-slot-text {
+  color: var(--wax);
+}
+
+.k-slot[data-wound='true'] {
+  background-color: color-mix(in srgb, var(--wax) 8%, transparent);
+}
+
+/* Cross drawn in CSS: emoji glyphs would break the printed look. */
+.k-slot-wound {
+  position: relative;
+  width: 15px;
+  height: 15px;
+  flex: 0 0 auto;
+  padding: 0;
+  border: 1.5px solid color-mix(in srgb, var(--ink) 35%, transparent);
+  border-radius: 3px;
+  background: transparent;
+  cursor: pointer;
+}
+
+.k-slot-wound::before,
+.k-slot-wound::after {
+  content: '';
+  position: absolute;
+  inset: 50% 2px auto 2px;
+  height: 1.5px;
+  background: color-mix(in srgb, var(--ink) 45%, transparent);
+  translate: 0 -50%;
+}
+
+.k-slot-wound::after {
+  rotate: 90deg;
+}
+
+.k-slot-wound:hover::before,
+.k-slot-wound:hover::after {
+  background: var(--ink);
+}
+
+.k-slot-wound[aria-pressed='true'] {
+  border-color: var(--wax);
+}
+
+.k-slot-wound[aria-pressed='true']::before,
+.k-slot-wound[aria-pressed='true']::after {
+  background: var(--wax);
+}
+
+/* ── Send panel ───────────────────────────────────────────── */
+
+.k-send {
+  margin-top: 8px;
+  padding: 8px 9px 9px;
+  border: var(--rule-hair) solid var(--ink);
+  border-radius: var(--radius);
+  background: var(--paper-hi);
+}
+
+.k-send-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.k-send-count {
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-soft);
+}
+
+.k-send-empty {
+  margin: 0;
+  font-size: 12.5px;
+  font-style: italic;
+  color: var(--ink-soft);
+}
+
+.k-send-targets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.k-send-target {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 3px 8px;
+  border: var(--rule-hair) solid var(--ink);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--ink);
+  font: 400 13px/1.2 'EB Garamond', serif;
+  cursor: pointer;
+}
+
+.k-send-target[data-active='true'] {
+  background: var(--ink);
+  color: var(--paper-hi);
+}
+
+.k-send-target[data-dead='true'] .k-send-target-name {
+  text-decoration: line-through;
+  opacity: 0.7;
+}
+
+.k-send-target-free {
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  opacity: 0.7;
+}
+
+.k-send-foot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.k-app-action:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.k-send-notice {
+  font-size: 12px;
+  font-style: italic;
+  color: var(--ink-soft);
+  min-width: 0;
+}
+
+/* ── Death ────────────────────────────────────────────────── */
+
+.k-dead-switch {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+  cursor: pointer;
+}
+
+.k-dead-switch input {
+  accent-color: var(--wax);
+  cursor: pointer;
+}
+
+.k-input[data-struck='true'] {
+  text-decoration: line-through;
+  text-decoration-thickness: 1.5px;
+  color: var(--wax);
+}
+
+.k-tab[data-dead='true'] .k-tab-name {
   text-decoration: line-through;
 }
 

@@ -1,8 +1,8 @@
 import { useState } from 'react'
 import type { Meta, StoryObj } from '@storybook/react-vite'
-import { expect, userEvent } from 'storybook/test'
+import { expect, userEvent, within } from 'storybook/test'
 import { CharacterSheet } from './CharacterSheet'
-import { createCharacter, type Character } from './types'
+import { createCharacter, emptySlots, type Character } from './types'
 
 const meta = {
   title: 'Knave/CharacterSheet',
@@ -21,19 +21,15 @@ export default meta
 
 type Story = StoryObj<typeof meta>
 
-function Harness({
-  seed,
-  width,
-}: {
-  seed: Partial<Character>
-  width: number
-}) {
-  const [character, setCharacter] = useState(() => createCharacter(seed))
-  return (
-    <div style={{ width, margin: '0 auto' }}>
-      <CharacterSheet character={character} onChange={setCharacter} />
-    </div>
-  )
+function rows(items: (string | { wound: string })[]) {
+  const slots = emptySlots()
+  items.forEach((item, index) => {
+    slots[index] =
+      typeof item === 'string'
+        ? { text: item, wound: false }
+        : { text: item.wound, wound: true }
+  })
+  return slots
 }
 
 const jarmila: Partial<Character> = {
@@ -48,11 +44,11 @@ const jarmila: Partial<Character> = {
     sila: 2,
     obratnost: 1,
     odolnost: 2,
-    inteligence: 0,
+    inteligence: 1,
     moudrost: 1,
-    charisma: -1,
+    charisma: 1,
   },
-  slots: [
+  slots: rows([
     'Rýč',
     'Lucerna',
     'Olej ×2',
@@ -61,19 +57,43 @@ const jarmila: Partial<Character> = {
     'Kožená zbroj',
     'Štít',
     'Dýka',
-    '',
-    '',
-    '',
-    '',
-    '',
-    '',
-    '',
-    '',
-    '',
-    '',
-    '',
-    '',
-  ],
+  ]),
+}
+
+function Harness({
+  seed,
+  width,
+  withSend = false,
+}: {
+  seed: Partial<Character>
+  width: number
+  withSend?: boolean
+}) {
+  const [character, setCharacter] = useState(() => createCharacter(seed))
+  const [notice, setNotice] = useState('')
+  return (
+    <div style={{ width, margin: '0 auto' }}>
+      <CharacterSheet
+        character={character}
+        onChange={setCharacter}
+        sendNotice={withSend ? notice : undefined}
+        sendTargets={
+          withSend
+            ? [
+                { id: 'bohus', name: 'Bohuš', dead: false, freeRows: 4 },
+                { id: 'kveta', name: 'Květa', dead: true, freeRows: 0 },
+              ]
+            : undefined
+        }
+        onSend={
+          withSend
+            ? (targetId, indices) =>
+                setNotice(`Posláno ${targetId}: ${indices.length} ř.`)
+            : undefined
+        }
+      />
+    </div>
+  )
 }
 
 /** The sheet at the size of the Owlbear Rodeo popover. */
@@ -92,18 +112,61 @@ export const InPopover: Story = {
 export const Blank: Story = {
   render: () => <Harness seed={{}} width={480} />,
   play: async ({ canvas }) => {
-    await expect(canvas.getByText('0/10')).toBeVisible()
+    // Every bonus starts at +1, so capacity starts at 11.
+    await expect(canvas.getByText('0/11')).toBeVisible()
   },
 }
 
-/** Raising Odolnost frees up more item rows. */
-export const CapacityFollowsOdolnost: Story = {
+/** Obrana follows the bonus and is never typed in. */
+export const DefenseFollowsBonus: Story = {
   render: () => <Harness seed={jarmila} width={480} />,
   play: async ({ canvas }) => {
-    const odolnost = canvas.getByLabelText('Odolnost')
-    await userEvent.clear(odolnost)
-    await userEvent.type(odolnost, '5')
-    await expect(canvas.getByText('8/15')).toBeVisible()
+    const sila = canvas.getByLabelText('Síla')
+    // Scoped to the Síla row: other abilities share the same bonus.
+    const row = within(sila.closest('.k-dial') as HTMLElement)
+    await expect(row.getByText('obr 12')).toBeVisible()
+    await userEvent.clear(sila)
+    await userEvent.type(sila, '7')
+    await expect(row.getByText('obr 17')).toBeVisible()
+  },
+}
+
+/** A wound takes an item row and is struck through. */
+export const WoundedRow: Story = {
+  render: () => <Harness seed={jarmila} width={480} />,
+  play: async ({ canvas }) => {
+    await userEvent.click(canvas.getByLabelText('Označit řádek 9 jako zranění'))
+    // The wound now occupies a row, so nine of twelve are taken.
+    await expect(canvas.getByText('9/12')).toBeVisible()
+    await userEvent.type(canvas.getByLabelText('Řádek 9'), 'Zlomená ruka')
+    await expect(canvas.getByLabelText('Řádek 9')).toHaveValue('Zlomená ruka')
+  },
+}
+
+export const Dead: Story = {
+  render: () => <Harness seed={{ ...jarmila, dead: true }} width={480} />,
+  play: async ({ canvas }) => {
+    await expect(canvas.getByLabelText('Jméno')).toHaveAttribute(
+      'data-struck',
+      'true',
+    )
+  },
+}
+
+/** Ticking rows enables handing them to another sheet. */
+export const SendingItems: Story = {
+  render: () => <Harness seed={jarmila} width={480} withSend />,
+  play: async ({ canvas }) => {
+    await expect(canvas.getByText('Zaškrtni předměty vlevo')).toBeVisible()
+    await userEvent.click(canvas.getByLabelText('Poslat řádek 1'))
+    await userEvent.click(canvas.getByLabelText('Poslat řádek 2'))
+    await expect(canvas.getByText('Vybráno 2')).toBeVisible()
+    // A dead recipient stays listed, struck through.
+    const kveta = canvas.getByRole('radio', { name: /Květa/ })
+    await expect(kveta).toHaveAttribute('data-dead', 'true')
+    await userEvent.click(canvas.getByRole('radio', { name: /Bohuš/ }))
+    await userEvent.click(canvas.getByRole('button', { name: 'Poslat' }))
+    await expect(canvas.getByText(/Posláno bohus: 2/)).toBeVisible()
   },
 }
 

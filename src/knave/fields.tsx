@@ -6,6 +6,7 @@ export type NumberInputProps = {
   value: number
   onChange: (value: number) => void
   min?: number
+  max?: number
   'aria-label'?: string
 }
 
@@ -20,6 +21,7 @@ export function NumberInput({
   value,
   onChange,
   min,
+  max,
   'aria-label': ariaLabel,
 }: NumberInputProps) {
   const [draft, setDraft] = useState(() => String(value))
@@ -37,6 +39,7 @@ export function NumberInput({
       type="number"
       inputMode="numeric"
       min={min}
+      max={max}
       aria-label={ariaLabel}
       value={draft}
       onChange={(event) => {
@@ -44,7 +47,8 @@ export function NumberInput({
         setDraft(raw)
         const parsed = Number.parseInt(raw, 10)
         if (Number.isNaN(parsed)) return
-        onChange(min === undefined ? parsed : Math.max(min, parsed))
+        const floored = min === undefined ? parsed : Math.max(min, parsed)
+        onChange(max === undefined ? floored : Math.min(max, floored))
       }}
       onBlur={() => setDraft(String(value))}
     />
@@ -65,6 +69,8 @@ export type InkFieldProps = {
   value: string
   onChange: (value: string) => void
   placeholder?: string
+  /** Struck through, for the name of a dead character. */
+  struck?: boolean
 }
 
 /** A label over a dotted writing line, like JMÉNO or POVOLÁNÍ. */
@@ -73,6 +79,7 @@ export function InkField({
   value,
   onChange,
   placeholder,
+  struck = false,
 }: InkFieldProps) {
   const id = useId()
   return (
@@ -84,6 +91,7 @@ export function InkField({
         <input
           id={id}
           className="k-input"
+          data-struck={struck}
           value={value}
           placeholder={placeholder}
           onChange={(event) => onChange(event.target.value)}

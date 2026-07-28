@@ -1,5 +1,7 @@
+import { useState } from 'react'
 import { AbilityDial } from './AbilityDial'
 import { HealthPennant } from './HealthPennant'
+import { SendPanel, type SendTarget } from './SendPanel'
 import { SlotList } from './SlotList'
 import {
   HexField,
@@ -15,18 +17,37 @@ export type CharacterSheetProps = {
   character: Character
   onChange: (next: Character) => void
   portraitEditable?: boolean
+  /** Recipients for handing items over. Omit to hide the send panel. */
+  sendTargets?: SendTarget[]
+  onSend?: (targetId: string, indices: number[]) => void
+  /** Outcome of the last send attempt. */
+  sendNotice?: string
 }
 
 export function CharacterSheet({
   character,
   onChange,
   portraitEditable = true,
+  sendTargets,
+  onSend,
+  sendNotice,
 }: CharacterSheetProps) {
+  const [picked, setPicked] = useState<number[]>([])
+
   const patch = (changes: Partial<Character>) =>
     onChange({ ...character, ...changes })
 
+  const sendable = (index: number) => {
+    const slot = character.slots[index]
+    return slot !== undefined && !slot.wound && slot.text.trim() !== ''
+  }
+
+  // Rows emptied by a completed send drop out of the selection on their own.
+  const selected = picked.filter(sendable)
+  const sending = sendTargets !== undefined && onSend !== undefined
+
   return (
-    <div className="k-sheet">
+    <div className="k-sheet" data-dead={character.dead}>
       <div className="k-sheet-head">
         <div className="k-sheet-identity">
           <Wordmark />
@@ -34,6 +55,7 @@ export function CharacterSheet({
             label="Jméno"
             value={character.name}
             placeholder="Kdo to je"
+            struck={character.dead}
             onChange={(name) => patch({ name })}
           />
           <InkField
@@ -42,6 +64,14 @@ export function CharacterSheet({
             placeholder="Čím se živí"
             onChange={(career) => patch({ career })}
           />
+          <label className="k-dead-switch">
+            <input
+              type="checkbox"
+              checked={character.dead}
+              onChange={(event) => patch({ dead: event.target.checked })}
+            />
+            Mrtvý
+          </label>
         </div>
         <div className="k-sheet-stats">
           <HexField
@@ -107,12 +137,37 @@ export function CharacterSheet({
         <SlotList
           slots={character.slots}
           capacity={slotCapacity(character)}
-          onSlotChange={(index, value) => {
+          selected={sending ? selected : undefined}
+          onSelectToggle={
+            sending
+              ? (index) =>
+                  setPicked((current) =>
+                    current.includes(index)
+                      ? current.filter((item) => item !== index)
+                      : [...current, index],
+                  )
+              : undefined
+          }
+          onSlotChange={(index, text) => {
             const slots = character.slots.slice()
-            slots[index] = value
+            slots[index] = { ...slots[index], text }
+            patch({ slots })
+          }}
+          onWoundToggle={(index) => {
+            const slots = character.slots.slice()
+            slots[index] = { ...slots[index], wound: !slots[index].wound }
             patch({ slots })
           }}
         />
+
+        {sending && (
+          <SendPanel
+            selectedCount={selected.length}
+            targets={sendTargets}
+            notice={sendNotice}
+            onSend={(targetId) => onSend(targetId, selected)}
+          />
+        )}
       </div>
     </div>
   )

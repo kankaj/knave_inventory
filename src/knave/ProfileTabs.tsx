@@ -25,6 +25,7 @@ export function ProfileTabs({
           aria-selected={entry.profile.id === activeId}
           data-active={entry.profile.id === activeId}
           data-offline={!entry.connected}
+          data-dead={entry.profile.character.dead}
           onClick={() => onSelect(entry.profile.id)}
         >
           <span

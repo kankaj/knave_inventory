@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import OBR, { type Player } from '@owlbear-rodeo/sdk'
 import { chooseProfile } from './identity'
+import { sendItems, type SendResult } from './transfer'
 import {
   createProfile,
   normalizeProfile,
@@ -223,6 +224,44 @@ export function useProfiles() {
     [flush],
   )
 
+  /**
+   * Move items between two sheets in one write, so nobody sees an in-between
+   * state where the items exist twice or not at all.
+   */
+  const sendBetween = useCallback(
+    async (
+      fromId: string,
+      toId: string,
+      indices: readonly number[],
+    ): Promise<SendResult> => {
+      const from = profiles[fromId]
+      const to = profiles[toId]
+      if (!from || !to) {
+        return { ok: false, reason: 'no-selection', free: 0, needed: 0 }
+      }
+
+      const result = sendItems(from.character, to.character, indices)
+      if (!result.ok) return result
+
+      const nextFrom = { ...from, character: result.from }
+      const nextTo = { ...to, character: result.to }
+      // Drop queued keystrokes for both sheets; the transfer supersedes them.
+      pending.current.delete(fromId)
+      pending.current.delete(toId)
+      setProfiles((current) => ({
+        ...current,
+        [fromId]: nextFrom,
+        [toId]: nextTo,
+      }))
+      await OBR.room.setMetadata({
+        [profileKey(fromId)]: nextFrom,
+        [profileKey(toId)]: nextTo,
+      })
+      return result
+    },
+    [profiles],
+  )
+
   const deleteProfile = useCallback(async (profileId: string) => {
     pending.current.delete(profileId)
     setProfiles((current) => {
@@ -271,5 +310,6 @@ export function useProfiles() {
     claimProfile,
     addProfile,
     deleteProfile,
+    sendBetween,
   }
 }

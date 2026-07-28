@@ -51,6 +51,33 @@ export const ABILITIES: readonly Ability[] = [
 /** Number of item rows printed on the sheet. */
 export const SLOT_COUNT = 20
 
+/** Bonuses are written straight onto the sheet, from +1 to +10. */
+export const ABILITY_MIN = 1
+export const ABILITY_MAX = 10
+
+/** Defense is never written down, it follows from the bonus. */
+export function abilityDefense(bonus: number): number {
+  return 10 + bonus
+}
+
+/**
+ * One item row. A wound occupies a row exactly like a carried item does, so
+ * being hurt costs carrying capacity.
+ */
+export type Slot = {
+  text: string
+  wound: boolean
+}
+
+export function emptySlots(): Slot[] {
+  return Array.from({ length: SLOT_COUNT }, () => ({ text: '', wound: false }))
+}
+
+/** A row is taken when it holds an item or a wound. */
+export function slotTaken(slot: Slot): boolean {
+  return slot.wound || slot.text.trim() !== ''
+}
+
 export type Character = {
   name: string
   /** POVOLÁNÍ */
@@ -66,9 +93,11 @@ export type Character = {
   /** ŽIV / MAX ŽIV */
   hp: { current: number; max: number }
   abilities: Record<AbilityKey, number>
-  /** Always SLOT_COUNT entries; an empty string is an empty row. */
-  slots: string[]
-  /** Data URL or image URL for PORTRÉT. */
+  /** Always SLOT_COUNT entries, items and wounds alike. */
+  slots: Slot[]
+  /** Struck through on the sheet, in the tab strip, and in the send-to list. */
+  dead: boolean
+  /** Image address for PORTRÉT. */
   portrait?: string
 }
 
@@ -82,14 +111,15 @@ export function createCharacter(overrides: Partial<Character> = {}): Character {
     armorBonus: 0,
     hp: { current: 6, max: 6 },
     abilities: {
-      sila: 0,
-      obratnost: 0,
-      odolnost: 0,
-      inteligence: 0,
-      moudrost: 0,
-      charisma: 0,
+      sila: ABILITY_MIN,
+      obratnost: ABILITY_MIN,
+      odolnost: ABILITY_MIN,
+      inteligence: ABILITY_MIN,
+      moudrost: ABILITY_MIN,
+      charisma: ABILITY_MIN,
     },
-    slots: Array.from({ length: SLOT_COUNT }, () => ''),
+    slots: emptySlots(),
+    dead: false,
     ...overrides,
   }
 }
@@ -146,13 +176,13 @@ export function normalizeCharacter(raw: unknown): Character {
   if (!raw || typeof raw !== 'object') return base
   const input = raw as Partial<Character>
 
-  const slots = Array.isArray(input.slots) ? input.slots : []
+  const slots: unknown[] = Array.isArray(input.slots) ? input.slots : []
   const abilities = { ...base.abilities }
   if (input.abilities && typeof input.abilities === 'object') {
     for (const key of Object.keys(abilities) as AbilityKey[]) {
       const value = input.abilities[key]
       if (typeof value === 'number' && Number.isFinite(value)) {
-        abilities[key] = value
+        abilities[key] = clamp(value, ABILITY_MIN, ABILITY_MAX)
       }
     }
   }
@@ -168,10 +198,28 @@ export function normalizeCharacter(raw: unknown): Character {
     hp: { max, current: Math.min(number(input.hp?.current, max), max) },
     abilities,
     slots: Array.from({ length: SLOT_COUNT }, (_, index) =>
-      typeof slots[index] === 'string' ? slots[index] : '',
+      normalizeSlot(slots[index]),
     ),
+    dead: input.dead === true,
     portrait: typeof input.portrait === 'string' ? input.portrait : undefined,
   }
+}
+
+/** Rows used to be plain strings before wounds existed. */
+function normalizeSlot(raw: unknown): Slot {
+  if (typeof raw === 'string') return { text: raw, wound: false }
+  if (raw && typeof raw === 'object') {
+    const slot = raw as Partial<Slot>
+    return {
+      text: typeof slot.text === 'string' ? slot.text : '',
+      wound: slot.wound === true,
+    }
+  }
+  return { text: '', wound: false }
+}
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, Math.round(value)))
 }
 
 function text(value: unknown): string {
@@ -193,5 +241,5 @@ export function slotCapacity(character: Character): number {
 }
 
 export function usedSlots(character: Character): number {
-  return character.slots.filter((slot) => slot.trim() !== '').length
+  return character.slots.filter(slotTaken).length
 }

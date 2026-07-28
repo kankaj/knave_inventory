@@ -91,8 +91,26 @@ later without touching them.
 | `NumberInput`    | Numeric field that can be emptied while typing         |
 | `AbilityDial`    | Circled bonus plus ability name and its uses           |
 | `HealthPennant`  | Vertical ŽIV track; click a pip to set current health  |
-| `SlotList`       | The 20 numbered item rows, 1–10 left and 11–20 right   |
+| `SlotList`       | The 20 numbered rows, 1–10 left and 11–20 right        |
+| `SendPanel`      | Pick a recipient for the ticked items                  |
 | `CharacterSheet` | Everything composed at popover width                   |
+
+### Rules baked into the sheet
+
+- **Bonuses only.** Ability circles take +1 to +10 and nothing else. Obrana is
+  never written down: it is `10 + bonus`, shown read-only beside each ability.
+- **Wounds cost carrying capacity.** Any row can be toggled into a wound with
+  the cross at its right edge. A wound row is struck through, holds its own
+  text, and counts against capacity exactly like carried gear, so a hurt
+  character carries less.
+- **Death is a manual switch.** The *Mrtvý* toggle strikes the name through on
+  the sheet, in the tab strip, and in the send-to list. Nothing flips it
+  automatically — wounds filling every row do not kill anyone by themselves.
+- **Items change hands whole.** Tick rows, pick a recipient, press *Poslat*.
+  Several items move at once in a single metadata write, so they are never
+  duplicated or briefly missing. Wounds are not sendable. If the recipient has
+  fewer free rows than the shipment needs, the send is refused and says how
+  many rows they had — nothing is silently dropped or pushed over capacity.
 
 Styling lives in `src/knave/sheet.css`: ink on parchment, heavy rules, and
 `clip-path` shapes for the hexagons and pennants. Fonts (EB Garamond,

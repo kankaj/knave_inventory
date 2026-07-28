@@ -34,7 +34,7 @@ function SingleHarness() {
 }
 
 function AllSixHarness() {
-  const [values, setValues] = useState(() => [1, 0, 3, 2, 0, -1])
+  const [values, setValues] = useState(() => [1, 4, 3, 2, 6, 10])
   return (
     <div className="k-dials">
       {ABILITIES.map((ability, index) => (
@@ -64,6 +64,19 @@ export const Single: Story = {
 export const AllSix: Story = {
   render: () => <AllSixHarness />,
   play: async ({ canvas }) => {
-    await expect(canvas.getByLabelText('Charisma')).toHaveValue(-1)
+    await expect(canvas.getByLabelText('Charisma')).toHaveValue(10)
+    // Obrana is ten plus the bonus, shown but never typed.
+    await expect(canvas.getByText('obr 20')).toBeVisible()
+  },
+}
+
+/** Bonuses only go from +1 to +10, so typing past that is clamped. */
+export const ClampedToWritableRange: Story = {
+  render: () => <SingleHarness />,
+  play: async ({ canvas }) => {
+    const dial = canvas.getByLabelText('Síla')
+    await userEvent.clear(dial)
+    await userEvent.type(dial, '40')
+    await expect(dial).toHaveValue(10)
   },
 }

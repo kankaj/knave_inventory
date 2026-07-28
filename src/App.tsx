@@ -3,6 +3,7 @@ import OBR from '@owlbear-rodeo/sdk'
 import { CharacterSheet } from './knave/CharacterSheet'
 import { ProfileTabs } from './knave/ProfileTabs'
 import { useProfiles } from './knave/storage'
+import { freeRows } from './knave/transfer'
 import './knave/sheet.css'
 import './App.css'
 
@@ -38,8 +39,10 @@ function Room() {
     claimProfile,
     addProfile,
     deleteProfile,
+    sendBetween,
   } = useProfiles()
   const [selectedId, setSelectedId] = useState('')
+  const [sendNotice, setSendNotice] = useState('')
 
   const active =
     entries.find((entry) => entry.profile.id === selectedId) ??
@@ -71,6 +74,36 @@ function Room() {
         <CharacterSheet
           character={active.profile.character}
           onChange={(next) => updateCharacter(active.profile.id, next)}
+          sendNotice={sendNotice}
+          sendTargets={entries
+            .filter((entry) => entry.profile.id !== active.profile.id)
+            .map((entry) => ({
+              id: entry.profile.id,
+              name: entry.displayName,
+              dead: entry.profile.character.dead,
+              freeRows: freeRows(entry.profile.character),
+            }))}
+          onSend={(targetId, indices) => {
+            setSendNotice('')
+            void sendBetween(active.profile.id, targetId, indices).then(
+              (result) => {
+                const target = entries.find(
+                  (entry) => entry.profile.id === targetId,
+                )
+                if (result.ok) {
+                  setSendNotice(
+                    `Posláno ${target?.displayName ?? ''}: ${result.moved.join(', ')}`,
+                  )
+                } else if (result.reason === 'no-room') {
+                  setSendNotice(
+                    `${target?.displayName ?? 'Příjemce'} má volno jen ${result.free} — posíláš ${result.needed}.`,
+                  )
+                } else {
+                  setSendNotice('Nic není vybráno k poslání.')
+                }
+              },
+            )
+          }}
         />
       </div>
 
