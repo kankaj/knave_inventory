@@ -1,0 +1,15 @@
+{
+  "name": "Knave Inventory",
+  "version": "0.1.0",
+  "manifest_version": 1,
+  "description": "Inventory tracker for Knave characters.",
+  "author": "Jaroslav Kaňka",
+  "icon": "/icon.svg",
+  "action": {
+    "title": "Knave Inventory",
+    "icon": "/icon.svg",
+    "popover": "/",
+    "height": 600,
+    "width": 400
+  }
+}
