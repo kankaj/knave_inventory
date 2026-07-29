@@ -1,13 +1,7 @@
 import { useState } from 'react'
 import type { Meta, StoryObj } from '@storybook/react-vite'
 import { expect, userEvent } from 'storybook/test'
-import {
-  HexField,
-  InkField,
-  PortraitFrame,
-  RibbonField,
-  Wordmark,
-} from './fields'
+import { HexField, NameMark, NotesField, RibbonField } from './fields'
 import './sheet.css'
 
 const meta = {
@@ -25,27 +19,14 @@ export default meta
 
 type Story = StoryObj<typeof meta>
 
-function InkFieldHarness() {
+function NameHarness({ struck = false }: { struck?: boolean }) {
   const [value, setValue] = useState('')
-  return (
-    <InkField
-      label="Jméno"
-      value={value}
-      placeholder="Kdo to je"
-      onChange={setValue}
-    />
-  )
+  return <NameMark value={value} struck={struck} onChange={setValue} />
 }
 
-function HexHarness() {
-  const [tz, setTz] = useState(13)
-  const [bz, setBz] = useState(2)
-  return (
-    <div style={{ display: 'flex', gap: 10 }}>
-      <HexField label="TZ" value={tz} onChange={setTz} />
-      <HexField label="BZ" value={bz} onChange={setBz} />
-    </div>
-  )
+function ShieldHarness() {
+  const [shield, setShield] = useState(2)
+  return <HexField label="Štít" value={shield} onChange={setShield} />
 }
 
 function RibbonHarness() {
@@ -61,12 +42,14 @@ function RibbonHarness() {
   )
 }
 
-export const Wordmarks: Story = {
-  render: () => <Wordmark />,
+function NotesHarness() {
+  const [notes, setNotes] = useState('')
+  return <NotesField value={notes} onChange={setNotes} />
 }
 
-export const WritingLine: Story = {
-  render: () => <InkFieldHarness />,
+/** The name is written in the blackletter face the logo used to use. */
+export const Name: Story = {
+  render: () => <NameHarness />,
   play: async ({ canvas }) => {
     const input = canvas.getByLabelText('Jméno')
     await userEvent.type(input, 'Jarmila Hrdlořezná')
@@ -74,15 +57,26 @@ export const WritingLine: Story = {
   },
 }
 
-export const Hexes: Story = {
-  render: () => <HexHarness />,
+export const NameOfTheDead: Story = {
+  render: () => <NameHarness struck />,
   play: async ({ canvas }) => {
-    const tz = canvas.getByLabelText('TZ')
-    await expect(tz).toHaveValue(13)
+    await expect(canvas.getByLabelText('Jméno')).toHaveAttribute(
+      'data-struck',
+      'true',
+    )
+  },
+}
+
+/** Only numbers go in the shield. */
+export const Shield: Story = {
+  render: () => <ShieldHarness />,
+  play: async ({ canvas }) => {
+    const shield = canvas.getByLabelText('Štít')
+    await expect(shield).toHaveAttribute('type', 'number')
     // Clear and retype must replace, not append.
-    await userEvent.clear(tz)
-    await userEvent.type(tz, '16')
-    await expect(tz).toHaveValue(16)
+    await userEvent.clear(shield)
+    await userEvent.type(shield, '4')
+    await expect(shield).toHaveValue(4)
   },
 }
 
@@ -93,24 +87,11 @@ export const Ribbon: Story = {
   },
 }
 
-function PortraitHarness() {
-  const [url, setUrl] = useState('')
-  return <PortraitFrame src={url} onUrlChange={setUrl} />
-}
-
-export const PortraitEmpty: Story = {
-  render: () => <PortraitHarness />,
+export const Notes: Story = {
+  render: () => <NotesHarness />,
   play: async ({ canvas }) => {
-    await expect(canvas.getByText('Vlož odkaz na obrázek')).toBeVisible()
-    const field = canvas.getByLabelText('Odkaz na portrét')
-    await userEvent.type(field, 'https://example.test/jarmila.png')
-    await expect(field).toHaveValue('https://example.test/jarmila.png')
-  },
-}
-
-export const PortraitReadOnly: Story = {
-  render: () => <PortraitFrame />,
-  play: async ({ canvas }) => {
-    await expect(canvas.getByText('Bez portrétu')).toBeVisible()
+    const notes = canvas.getByLabelText('Poznámky')
+    await userEvent.type(notes, 'Dluží mi 3 zl.')
+    await expect(notes).toHaveValue('Dluží mi 3 zl.')
   },
 }

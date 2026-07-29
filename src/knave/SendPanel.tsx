@@ -3,7 +3,6 @@ import { useState } from 'react'
 export type SendTarget = {
   id: string
   name: string
-  dead: boolean
   /** Rows the recipient can still take. */
   freeRows: number
 }
@@ -17,7 +16,10 @@ export type SendPanelProps = {
   notice?: string
 }
 
-/** Pick the recipient for the ticked items and hand them over. */
+/**
+ * Pick the recipient for the ticked items and hand them over. Dead characters
+ * are never offered: they can give things away but cannot take any.
+ */
 export function SendPanel({
   selectedCount,
   targets,
@@ -33,13 +35,13 @@ export function SendPanel({
         <span className="k-label">Poslat komu</span>
         <span className="k-send-count">
           {selectedCount === 0
-            ? 'Zaškrtni předměty vlevo'
+            ? 'Zaškrtni předměty v seznamu'
             : `Vybráno ${selectedCount}`}
         </span>
       </header>
 
       {targets.length === 0 ? (
-        <p className="k-send-empty">Nikdo jiný tu nemá list.</p>
+        <p className="k-send-empty">Nikdo živý tu nemá list.</p>
       ) : (
         <div className="k-send-targets" role="radiogroup" aria-label="Příjemce">
           {targets.map((candidate) => (
@@ -50,7 +52,6 @@ export function SendPanel({
               className="k-send-target"
               aria-checked={candidate.id === targetId}
               data-active={candidate.id === targetId}
-              data-dead={candidate.dead}
               onClick={() => setTargetId(candidate.id)}
             >
               <span className="k-send-target-name">{candidate.name}</span>

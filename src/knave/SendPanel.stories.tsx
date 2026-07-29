@@ -4,10 +4,10 @@ import { expect, userEvent } from 'storybook/test'
 import { SendPanel, type SendTarget } from './SendPanel'
 import './sheet.css'
 
+// The dead never appear here: they can give things away but cannot take any.
 const targets: SendTarget[] = [
-  { id: 'bohus', name: 'Bohuš', dead: false, freeRows: 4 },
-  { id: 'ondra', name: 'Ondra', dead: false, freeRows: 0 },
-  { id: 'kveta', name: 'Květa Nezvěstná', dead: true, freeRows: 7 },
+  { id: 'bohus', name: 'Bohuš', freeRows: 4 },
+  { id: 'ondra', name: 'Ondra', freeRows: 0 },
 ]
 
 const meta = {
@@ -46,7 +46,7 @@ function Harness({ count }: { count: number }) {
 export const NothingPicked: Story = {
   render: () => <Harness count={0} />,
   play: async ({ canvas }) => {
-    await expect(canvas.getByText('Zaškrtni předměty vlevo')).toBeVisible()
+    await expect(canvas.getByText('Zaškrtni předměty v seznamu')).toBeVisible()
     await expect(canvas.getByRole('button', { name: 'Poslat' })).toBeDisabled()
   },
 }
@@ -65,20 +65,18 @@ export const NeedsARecipient: Story = {
   },
 }
 
-/** Dead characters stay in the list, struck through. */
-export const DeadRecipientIsStruck: Story = {
+/** Only the living are offered as recipients. */
+export const OnlyTheLivingAreListed: Story = {
   render: () => <Harness count={1} />,
   play: async ({ canvas }) => {
-    await expect(canvas.getByRole('radio', { name: /Květa/ })).toHaveAttribute(
-      'data-dead',
-      'true',
-    )
+    await expect(canvas.getAllByRole('radio')).toHaveLength(2)
+    await expect(canvas.queryByRole('radio', { name: /Květa/ })).toBeNull()
   },
 }
 
 export const NobodyToSendTo: Story = {
   args: { targets: [], selectedCount: 1 },
   play: async ({ canvas }) => {
-    await expect(canvas.getByText('Nikdo jiný tu nemá list.')).toBeVisible()
+    await expect(canvas.getByText('Nikdo živý tu nemá list.')).toBeVisible()
   },
 }

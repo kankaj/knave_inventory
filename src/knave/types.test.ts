@@ -15,15 +15,37 @@ describe('normalizeCharacter', () => {
   it('migrates the plain string rows written before wounds existed', () => {
     const character = normalizeCharacter({ slots: ['Meč', 'Štít'] })
     expect(character.slots).toHaveLength(SLOT_COUNT)
-    expect(character.slots[0]).toEqual({ text: 'Meč', wound: false })
-    expect(character.slots[19]).toEqual({ text: '', wound: false })
+    expect(character.slots[0]).toEqual({ text: 'Meč', note: '', wound: false })
+    expect(character.slots[19]).toEqual({ text: '', note: '', wound: false })
   })
 
   it('keeps wound rows', () => {
     const character = normalizeCharacter({
       slots: [{ text: 'Zlomená ruka', wound: true }],
     })
-    expect(character.slots[0]).toEqual({ text: 'Zlomená ruka', wound: true })
+    expect(character.slots[0]).toEqual({
+      text: 'Zlomená ruka',
+      note: '',
+      wound: true,
+    })
+  })
+
+  it('keeps the note written beside a row', () => {
+    const character = normalizeCharacter({
+      slots: [{ text: 'Lucerna', note: 'půjčená od Bohuše', wound: false }],
+    })
+    expect(character.slots[0].note).toBe('půjčená od Bohuše')
+    // A note of the wrong type must not break the row.
+    expect(
+      normalizeCharacter({ slots: [{ text: 'Meč', note: 7 }] }).slots[0],
+    ).toEqual({ text: 'Meč', note: '', wound: false })
+  })
+
+  it('reads the shield from sheets still holding the old armour class', () => {
+    expect(normalizeCharacter({ armorClass: 13 }).shield).toBe(13)
+    // The shield wins once it has been written.
+    expect(normalizeCharacter({ armorClass: 13, shield: 2 }).shield).toBe(2)
+    expect(normalizeCharacter({}).shield).toBe(0)
   })
 
   it('defaults dead to false and only trusts a real true', () => {
@@ -63,11 +85,11 @@ describe('normalizeCharacter', () => {
     })
   })
 
-  it('keeps a portrait address but rejects other types', () => {
-    expect(
-      normalizeCharacter({ portrait: 'https://a.test/x.png' }).portrait,
-    ).toBe('https://a.test/x.png')
-    expect(normalizeCharacter({ portrait: 12 }).portrait).toBeUndefined()
+  it('keeps the free-form notes but rejects other types', () => {
+    expect(normalizeCharacter({ notes: 'Dluží mi 3 zl.' }).notes).toBe(
+      'Dluží mi 3 zl.',
+    )
+    expect(normalizeCharacter({ notes: 12 }).notes).toBe('')
   })
 })
 
@@ -114,14 +136,20 @@ describe('slotCapacity', () => {
 describe('usedSlots', () => {
   it('ignores rows holding only whitespace', () => {
     const character = createCharacter()
-    character.slots[0] = { text: 'Rýč', wound: false }
-    character.slots[1] = { text: '   ', wound: false }
+    character.slots[0] = { text: 'Rýč', note: '', wound: false }
+    character.slots[1] = { text: '   ', note: '', wound: false }
     expect(usedSlots(character)).toBe(1)
   })
 
   it('counts a wound row even when it has no text yet', () => {
     const character = createCharacter()
-    character.slots[0] = { text: '', wound: true }
+    character.slots[0] = { text: '', note: '', wound: true }
     expect(usedSlots(character)).toBe(1)
+  })
+
+  it('ignores a row that holds only a note', () => {
+    const character = createCharacter()
+    character.slots[0] = { text: '', note: 'na co to bylo?', wound: false }
+    expect(usedSlots(character)).toBe(0)
   })
 })

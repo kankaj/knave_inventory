@@ -21,7 +21,8 @@ default since v6.0.9).
 2. Use the manifest URL: `http://localhost:5173/manifest.json`
 3. Create a room and enable the extension in the Create Room dialog.
 4. The extension action appears in the top left of the room; clicking it opens
-   the popover (`public/manifest.json` sets it to 400×600).
+   the popover (`public/manifest.json` sets it to 820×620, wide enough for the
+   landscape sheet).
 
 SDK calls only work inside that iframe — opening `localhost:5173` directly in a
 browser tab shows the "waiting for Owlbear Rodeo" state, because `OBR.onReady`
@@ -72,9 +73,6 @@ over incoming room updates until the room echoes them back. Profiles are read
 through `normalizeProfile`, so a stale or hand-edited metadata entry cannot
 break rendering.
 
-Portraits are stored as an image address, not an upload: an encoded image would
-not fit in shared room metadata.
-
 ## Sheet components
 
 `src/knave/` is a small component set drawn from the Knave 2e sheet. Every
@@ -82,41 +80,54 @@ component is controlled — it takes a value and an `onChange`, holds no state o
 its own, and knows nothing about Owlbear Rodeo, so persistence can be wired in
 later without touching them.
 
-| Component        | Sheet element                                          |
-| ---------------- | ------------------------------------------------------ |
-| `Wordmark`       | The blackletter *Knave* title                          |
-| `InkField`       | A label over a dotted writing line (JMÉNO, POVOLÁNÍ)   |
-| `HexField`       | Hexagon stat (TZ, BZ)                                  |
-| `RibbonField`    | ÚROVEŇ / ZK banner with the notched edge               |
-| `NumberInput`    | Numeric field that can be emptied while typing         |
-| `AbilityDial`    | Circled bonus plus ability name and its uses           |
-| `HealthPennant`  | Vertical ŽIV track; click a pip to set current health  |
-| `SlotList`       | The 20 numbered rows, 1–10 left and 11–20 right        |
-| `SendPanel`      | Pick a recipient for the ticked items                  |
-| `CharacterSheet` | Everything composed at popover width                   |
+| Component        | Sheet element                                           |
+| ---------------- | ------------------------------------------------------- |
+| `NameMark`       | The name, written in the blackletter face of the logo   |
+| `HexField`       | Hexagon stat (ŠTÍT), numbers only                       |
+| `RibbonField`    | ÚROVEŇ / ZK banner with the notched edge                |
+| `NotesField`     | Free-form scratch space beside the vitals               |
+| `NumberInput`    | Numeric field that can be emptied while typing          |
+| `AbilityDial`    | Named ring holding the bonus, with obrana set into it    |
+| `HealthPennant`  | Vertical ŽIV track; click a pip to set current health   |
+| `SlotList`       | The 20 numbered rows, each with a note beside it        |
+| `SendPanel`      | Pick a recipient for the ticked items                   |
+| `CharacterSheet` | Everything composed across a landscape popover          |
+
+The sheet reads across, not down: name, abilities and vitals on the left, the
+item column and its notes on the right, with ÚROVEŇ / ZK at the top right.
 
 ### Rules baked into the sheet
 
-- **Bonuses only.** Ability circles take +1 to +10 and nothing else. Obrana is
-  never written down: it is `10 + bonus`, shown read-only beside each ability.
+- **Bonuses only.** Ability rings take +1 to +10 and nothing else; a bigger
+  number is rewritten to 10 as it is typed. The bonus is always shown with its
+  sign, because it is added to a roll. Obrana is never written down: it is
+  `10 + bonus`, set into the top of the ring in place of that stretch of the
+  circle. What an ability is rolled for appears only on hover or focus, in a
+  tooltip that takes no pointer events so it cannot block the field.
 - **Wounds cost carrying capacity.** Any row can be toggled into a wound with
   the cross at its right edge. A wound row is struck through, holds its own
   text, and counts against capacity exactly like carried gear, so a hurt
   character carries less.
-- **Death is a manual switch.** The *Mrtvý* toggle strikes the name through on
-  the sheet, in the tab strip, and in the send-to list. Nothing flips it
-  automatically — wounds filling every row do not kill anyone by themselves.
+- **Death is a manual switch.** The *Mrtvý* toggle, at the bottom beside
+  *Vymazat*, strikes the name through on the sheet and in the tab strip. Nothing
+  flips it automatically — wounds filling every row do not kill anyone by
+  themselves.
+- **The dead only give.** A dead character can still hand things over, but is
+  never offered as a recipient, and `sendItems` refuses a dead recipient even if
+  one is passed in anyway.
 - **Items change hands whole.** Tick rows, pick a recipient, press *Poslat*.
   Several items move at once in a single metadata write, so they are never
-  duplicated or briefly missing. Wounds are not sendable. If the recipient has
-  fewer free rows than the shipment needs, the send is refused and says how
-  many rows they had — nothing is silently dropped or pushed over capacity.
+  duplicated or briefly missing. The note written beside a row travels with its
+  item. Wounds are not sendable. If the recipient has fewer free rows than the
+  shipment needs, the send is refused and says how many rows they had — nothing
+  is silently dropped or pushed over capacity.
 
 Styling lives in `src/knave/sheet.css`: ink on parchment, heavy rules, and
 `clip-path` shapes for the hexagons and pennants. Fonts (EB Garamond,
 UnifrakturMaguntia) are bundled through `@fontsource`, since the extension
-iframe cannot reach a CDN. The sheet folds to a single column below 420px via
-container queries.
+iframe cannot reach a CDN. Container queries fold the two halves into one column
+below 640px, and below 430px the dials go three across, the health track lies on
+its side, and each item note drops under its row.
 
 Item capacity follows Odolnost (`10 + odolnost`, capped at the 20 printed
 rows), because Odolnost is the ability the sheet lists "řádky předmětů" under.

@@ -65,8 +65,18 @@ export const AllSix: Story = {
   render: () => <AllSixHarness />,
   play: async ({ canvas }) => {
     await expect(canvas.getByLabelText('Charisma')).toHaveValue(10)
-    // Obrana is ten plus the bonus, shown but never typed.
-    await expect(canvas.getByText('obr 20')).toBeVisible()
+    // Obrana is ten plus the bonus, set into the ring but never typed.
+    await expect(canvas.getByTitle('Obrana 20')).toBeVisible()
+  },
+}
+
+/** The description is hidden until hover, and never blocks the field. */
+export const UsesOnHover: Story = {
+  render: () => <SingleHarness />,
+  play: async ({ canvas }) => {
+    const tip = canvas.getByRole('tooltip')
+    await expect(tip).toHaveTextContent('Útoky nablízko')
+    await expect(tip).toHaveStyle({ pointerEvents: 'none' })
   },
 }
 

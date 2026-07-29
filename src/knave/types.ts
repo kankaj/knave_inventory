@@ -10,7 +10,7 @@ export type Ability = {
   key: AbilityKey
   /** Name as printed on the sheet. */
   name: string
-  /** What the ability is rolled for, as printed under the name. */
+  /** What the ability is rolled for. Hidden until the dial is hovered. */
   uses: string
 }
 
@@ -62,54 +62,55 @@ export function abilityDefense(bonus: number): number {
 
 /**
  * One item row. A wound occupies a row exactly like a carried item does, so
- * being hurt costs carrying capacity.
+ * being hurt costs carrying capacity. The note travels with the item when it
+ * changes hands.
  */
 export type Slot = {
   text: string
+  note: string
   wound: boolean
 }
 
-export function emptySlots(): Slot[] {
-  return Array.from({ length: SLOT_COUNT }, () => ({ text: '', wound: false }))
+export function emptySlot(): Slot {
+  return { text: '', note: '', wound: false }
 }
 
-/** A row is taken when it holds an item or a wound. */
+export function emptySlots(): Slot[] {
+  return Array.from({ length: SLOT_COUNT }, emptySlot)
+}
+
+/** A row is taken when it holds an item or a wound. A bare note is not cargo. */
 export function slotTaken(slot: Slot): boolean {
   return slot.wound || slot.text.trim() !== ''
 }
 
 export type Character = {
   name: string
-  /** POVOLÁNÍ */
-  career: string
   /** ÚROVEŇ */
   level: number
   /** ZK */
   xp: number
-  /** TZ */
-  armorClass: number
-  /** BZ */
-  armorBonus: number
+  /** ŠTÍT */
+  shield: number
   /** ŽIV / MAX ŽIV */
   hp: { current: number; max: number }
+  /** Free-form scratch space next to the vitals. */
+  notes: string
   abilities: Record<AbilityKey, number>
   /** Always SLOT_COUNT entries, items and wounds alike. */
   slots: Slot[]
-  /** Struck through on the sheet, in the tab strip, and in the send-to list. */
+  /** Struck through on the sheet and in the tab strip. Cannot receive items. */
   dead: boolean
-  /** Image address for PORTRÉT. */
-  portrait?: string
 }
 
 export function createCharacter(overrides: Partial<Character> = {}): Character {
   return {
     name: '',
-    career: '',
     level: 1,
     xp: 0,
-    armorClass: 11,
-    armorBonus: 0,
+    shield: 0,
     hp: { current: 6, max: 6 },
+    notes: '',
     abilities: {
       sila: ABILITY_MIN,
       obratnost: ABILITY_MIN,
@@ -174,7 +175,7 @@ export function normalizeProfile(raw: unknown, fallbackId: string): Profile {
 export function normalizeCharacter(raw: unknown): Character {
   const base = createCharacter()
   if (!raw || typeof raw !== 'object') return base
-  const input = raw as Partial<Character>
+  const input = raw as Partial<Character> & { armorClass?: unknown }
 
   const slots: unknown[] = Array.isArray(input.slots) ? input.slots : []
   const abilities = { ...base.abilities }
@@ -190,32 +191,32 @@ export function normalizeCharacter(raw: unknown): Character {
   const max = number(input.hp?.max, base.hp.max)
   return {
     name: text(input.name),
-    career: text(input.career),
     level: number(input.level, base.level),
     xp: number(input.xp, base.xp),
-    armorClass: number(input.armorClass, base.armorClass),
-    armorBonus: number(input.armorBonus, base.armorBonus),
+    // Sheets written before the shield replaced TZ/BZ carry armorClass.
+    shield: number(input.shield, number(input.armorClass, base.shield)),
     hp: { max, current: Math.min(number(input.hp?.current, max), max) },
+    notes: text(input.notes),
     abilities,
     slots: Array.from({ length: SLOT_COUNT }, (_, index) =>
       normalizeSlot(slots[index]),
     ),
     dead: input.dead === true,
-    portrait: typeof input.portrait === 'string' ? input.portrait : undefined,
   }
 }
 
-/** Rows used to be plain strings before wounds existed. */
+/** Rows used to be plain strings, and later had no note. */
 function normalizeSlot(raw: unknown): Slot {
-  if (typeof raw === 'string') return { text: raw, wound: false }
+  if (typeof raw === 'string') return { text: raw, note: '', wound: false }
   if (raw && typeof raw === 'object') {
     const slot = raw as Partial<Slot>
     return {
       text: typeof slot.text === 'string' ? slot.text : '',
+      note: typeof slot.note === 'string' ? slot.note : '',
       wound: slot.wound === true,
     }
   }
-  return { text: '', wound: false }
+  return emptySlot()
 }
 
 function clamp(value: number, min: number, max: number): number {

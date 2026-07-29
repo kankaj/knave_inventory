@@ -1,8 +1,8 @@
-import { slotCapacity, slotTaken, type Character } from './types'
+import { emptySlot, slotCapacity, slotTaken, type Character } from './types'
 
 export type SendFailure = {
   ok: false
-  reason: 'no-selection' | 'no-room'
+  reason: 'no-selection' | 'no-room' | 'recipient-dead'
   /** Rows the recipient has available. */
   free: number
   /** Rows the shipment needs. */
@@ -29,8 +29,9 @@ export function freeRows(character: Character): number {
 
 /**
  * Hand items from one sheet to another. Wounds stay put — they are not
- * luggage. The send is refused outright when the recipient lacks rows, so
- * nothing is silently dropped or quietly pushed over capacity.
+ * luggage, and notes travel with the item they belong to. The send is refused
+ * outright when the recipient lacks rows or is dead, so nothing is silently
+ * dropped, quietly pushed over capacity, or handed to a corpse.
  */
 export function sendItems(
   from: Character,
@@ -60,6 +61,15 @@ export function sendItems(
     }
   }
 
+  if (to.dead) {
+    return {
+      ok: false,
+      reason: 'recipient-dead',
+      free: openRows.length,
+      needed: sending.length,
+    }
+  }
+
   if (openRows.length < sending.length) {
     return {
       ok: false,
@@ -76,8 +86,12 @@ export function sendItems(
   sending.forEach((fromIndex, position) => {
     const slot = nextFrom[fromIndex]
     moved.push(slot.text)
-    nextTo[openRows[position]] = { text: slot.text, wound: false }
-    nextFrom[fromIndex] = { text: '', wound: false }
+    nextTo[openRows[position]] = {
+      text: slot.text,
+      note: slot.note,
+      wound: false,
+    }
+    nextFrom[fromIndex] = emptySlot()
   })
 
   return {

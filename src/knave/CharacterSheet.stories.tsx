@@ -21,25 +21,29 @@ export default meta
 
 type Story = StoryObj<typeof meta>
 
-function rows(items: (string | { wound: string })[]) {
+type Row = string | { wound: string } | { item: string; note: string }
+
+function rows(items: Row[]) {
   const slots = emptySlots()
   items.forEach((item, index) => {
-    slots[index] =
-      typeof item === 'string'
-        ? { text: item, wound: false }
-        : { text: item.wound, wound: true }
+    if (typeof item === 'string') {
+      slots[index] = { text: item, note: '', wound: false }
+    } else if ('wound' in item) {
+      slots[index] = { text: item.wound, note: '', wound: true }
+    } else {
+      slots[index] = { text: item.item, note: item.note, wound: false }
+    }
   })
   return slots
 }
 
 const jarmila: Partial<Character> = {
   name: 'Jarmila Hrdlořezná',
-  career: 'Hrobařka',
   level: 3,
   xp: 1450,
-  armorClass: 13,
-  armorBonus: 2,
+  shield: 2,
   hp: { current: 5, max: 9 },
+  notes: 'Hrobařka. Dluží mi 3 zl.',
   abilities: {
     sila: 2,
     obratnost: 1,
@@ -50,7 +54,7 @@ const jarmila: Partial<Character> = {
   },
   slots: rows([
     'Rýč',
-    'Lucerna',
+    { item: 'Lucerna', note: 'Bohušova' },
     'Olej ×2',
     'Lano 15 m',
     'Zásoby ×3',
@@ -80,8 +84,8 @@ function Harness({
         sendTargets={
           withSend
             ? [
-                { id: 'bohus', name: 'Bohuš', dead: false, freeRows: 4 },
-                { id: 'kveta', name: 'Květa', dead: true, freeRows: 0 },
+                { id: 'bohus', name: 'Bohuš', freeRows: 4 },
+                { id: 'ondra', name: 'Ondra', freeRows: 9 },
               ]
             : undefined
         }
@@ -96,13 +100,14 @@ function Harness({
   )
 }
 
-/** The sheet at the size of the Owlbear Rodeo popover. */
+/** The sheet at the width of a landscape Owlbear Rodeo popover. */
 export const InPopover: Story = {
-  render: () => <Harness seed={jarmila} width={480} />,
+  render: () => <Harness seed={jarmila} width={760} />,
   play: async ({ canvas }) => {
     await expect(canvas.getByLabelText('Jméno')).toHaveValue(
       'Jarmila Hrdlořezná',
     )
+    await expect(canvas.getByLabelText('Štít')).toHaveValue(2)
     await expect(canvas.getByText('5/9')).toBeVisible()
     // Odolnost 2 → 12 usable rows.
     await expect(canvas.getByText('8/12')).toBeVisible()
@@ -110,7 +115,7 @@ export const InPopover: Story = {
 }
 
 export const Blank: Story = {
-  render: () => <Harness seed={{}} width={480} />,
+  render: () => <Harness seed={{}} width={760} />,
   play: async ({ canvas }) => {
     // Every bonus starts at +1, so capacity starts at 11.
     await expect(canvas.getByText('0/11')).toBeVisible()
@@ -119,21 +124,32 @@ export const Blank: Story = {
 
 /** Obrana follows the bonus and is never typed in. */
 export const DefenseFollowsBonus: Story = {
-  render: () => <Harness seed={jarmila} width={480} />,
+  render: () => <Harness seed={jarmila} width={760} />,
   play: async ({ canvas }) => {
     const sila = canvas.getByLabelText('Síla')
-    // Scoped to the Síla row: other abilities share the same bonus.
-    const row = within(sila.closest('.k-dial') as HTMLElement)
-    await expect(row.getByText('obr 12')).toBeVisible()
+    // Scoped to the Síla dial: other abilities share the same bonus.
+    const dial = within(sila.closest('.k-dial') as HTMLElement)
+    await expect(dial.getByTitle('Obrana 12')).toBeVisible()
     await userEvent.clear(sila)
     await userEvent.type(sila, '7')
-    await expect(row.getByText('obr 17')).toBeVisible()
+    await expect(dial.getByTitle('Obrana 17')).toBeVisible()
+  },
+}
+
+/** Bonuses run from +1 to +10, so a bigger number cannot be written. */
+export const BonusStopsAtTen: Story = {
+  render: () => <Harness seed={jarmila} width={760} />,
+  play: async ({ canvas }) => {
+    const sila = canvas.getByLabelText('Síla')
+    await userEvent.clear(sila)
+    await userEvent.type(sila, '14')
+    await expect(sila).toHaveValue(10)
   },
 }
 
 /** A wound takes an item row and is struck through. */
 export const WoundedRow: Story = {
-  render: () => <Harness seed={jarmila} width={480} />,
+  render: () => <Harness seed={jarmila} width={760} />,
   play: async ({ canvas }) => {
     await userEvent.click(canvas.getByLabelText('Označit řádek 9 jako zranění'))
     // The wound now occupies a row, so nine of twelve are taken.
@@ -143,8 +159,9 @@ export const WoundedRow: Story = {
   },
 }
 
+/** The name of a dead character is struck through. */
 export const Dead: Story = {
-  render: () => <Harness seed={{ ...jarmila, dead: true }} width={480} />,
+  render: () => <Harness seed={{ ...jarmila, dead: true }} width={760} />,
   play: async ({ canvas }) => {
     await expect(canvas.getByLabelText('Jméno')).toHaveAttribute(
       'data-struck',
@@ -153,24 +170,21 @@ export const Dead: Story = {
   },
 }
 
-/** Ticking rows enables handing them to another sheet. */
+/** Ticking rows enables handing them, notes and all, to another sheet. */
 export const SendingItems: Story = {
-  render: () => <Harness seed={jarmila} width={480} withSend />,
+  render: () => <Harness seed={jarmila} width={760} withSend />,
   play: async ({ canvas }) => {
-    await expect(canvas.getByText('Zaškrtni předměty vlevo')).toBeVisible()
+    await expect(canvas.getByText('Zaškrtni předměty v seznamu')).toBeVisible()
     await userEvent.click(canvas.getByLabelText('Poslat řádek 1'))
     await userEvent.click(canvas.getByLabelText('Poslat řádek 2'))
     await expect(canvas.getByText('Vybráno 2')).toBeVisible()
-    // A dead recipient stays listed, struck through.
-    const kveta = canvas.getByRole('radio', { name: /Květa/ })
-    await expect(kveta).toHaveAttribute('data-dead', 'true')
     await userEvent.click(canvas.getByRole('radio', { name: /Bohuš/ }))
     await userEvent.click(canvas.getByRole('button', { name: 'Poslat' }))
     await expect(canvas.getByText(/Posláno bohus: 2/)).toBeVisible()
   },
 }
 
-/** Narrow enough that the sheet folds to a single column. */
+/** Narrow enough that the two halves stack. */
 export const Narrow: Story = {
-  render: () => <Harness seed={jarmila} width={330} />,
+  render: () => <Harness seed={jarmila} width={400} />,
 }

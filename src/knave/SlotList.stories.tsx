@@ -14,6 +14,7 @@ const meta = {
     slots: emptySlots(),
     capacity: 11,
     onSlotChange: () => {},
+    onNoteChange: () => {},
     onWoundToggle: () => {},
   },
   decorators: [
@@ -29,13 +30,18 @@ export default meta
 
 type Story = StoryObj<typeof meta>
 
-function fill(items: (string | { wound: string })[]): Slot[] {
+type Row = string | { wound: string } | { item: string; note: string }
+
+function fill(items: Row[]): Slot[] {
   const slots = emptySlots()
   items.forEach((item, index) => {
-    slots[index] =
-      typeof item === 'string'
-        ? { text: item, wound: false }
-        : { text: item.wound, wound: true }
+    if (typeof item === 'string') {
+      slots[index] = { text: item, note: '', wound: false }
+    } else if ('wound' in item) {
+      slots[index] = { text: item.wound, note: '', wound: true }
+    } else {
+      slots[index] = { text: item.item, note: item.note, wound: false }
+    }
   })
   return slots
 }
@@ -45,7 +51,7 @@ function Harness({
   capacity,
   picking = false,
 }: {
-  items: (string | { wound: string })[]
+  items: Row[]
   capacity: number
   picking?: boolean
 }) {
@@ -70,6 +76,11 @@ function Harness({
       onSlotChange={(index, text) =>
         setSlots(
           slots.map((slot, i) => (i === index ? { ...slot, text } : slot)),
+        )
+      }
+      onNoteChange={(index, note) =>
+        setSlots(
+          slots.map((slot, i) => (i === index ? { ...slot, note } : slot)),
         )
       }
       onWoundToggle={(index) =>
@@ -112,6 +123,27 @@ export const Packed: Story = {
     await expect(canvas.getByText('10/12')).toBeVisible()
     await userEvent.type(canvas.getByLabelText('Řádek 11'), 'Pochodeň')
     await expect(canvas.getByText('11/12')).toBeVisible()
+  },
+}
+
+/** Every row has a note beside it, empty until something is written in it. */
+export const NotesBesideItems: Story = {
+  render: () => (
+    <Harness
+      items={[{ item: 'Lucerna', note: 'Bohušova' }, 'Olej ×2']}
+      capacity={12}
+    />
+  ),
+  play: async ({ canvas }) => {
+    await expect(canvas.getByLabelText('Poznámka k řádku 1')).toHaveValue(
+      'Bohušova',
+    )
+    const second = canvas.getByLabelText('Poznámka k řádku 2')
+    await expect(second).toHaveValue('')
+    await userEvent.type(second, 'skoro prázdný')
+    await expect(second).toHaveValue('skoro prázdný')
+    // A note alone does not eat a row.
+    await expect(canvas.getByText('2/12')).toBeVisible()
   },
 }
 

@@ -57,6 +57,17 @@ function Room() {
     )
   }
 
+  // The dead can hand things over but never take any, so they are left out of
+  // the recipient list entirely.
+  const sendTargets = entries
+    .filter((entry) => entry.profile.id !== active.profile.id)
+    .filter((entry) => !entry.profile.character.dead)
+    .map((entry) => ({
+      id: entry.profile.id,
+      name: entry.displayName,
+      freeRows: freeRows(entry.profile.character),
+    }))
+
   return (
     <div className="k-app">
       <div className="k-app-tabs">
@@ -75,14 +86,7 @@ function Room() {
           character={active.profile.character}
           onChange={(next) => updateCharacter(active.profile.id, next)}
           sendNotice={sendNotice}
-          sendTargets={entries
-            .filter((entry) => entry.profile.id !== active.profile.id)
-            .map((entry) => ({
-              id: entry.profile.id,
-              name: entry.displayName,
-              dead: entry.profile.character.dead,
-              freeRows: freeRows(entry.profile.character),
-            }))}
+          sendTargets={sendTargets}
           onSend={(targetId, indices) => {
             setSendNotice('')
             void sendBetween(active.profile.id, targetId, indices).then(
@@ -97,6 +101,10 @@ function Room() {
                 } else if (result.reason === 'no-room') {
                   setSendNotice(
                     `${target?.displayName ?? 'Příjemce'} má volno jen ${result.free} — posíláš ${result.needed}.`,
+                  )
+                } else if (result.reason === 'recipient-dead') {
+                  setSendNotice(
+                    `${target?.displayName ?? 'Příjemce'} je mrtvý a nemůže nic přijmout.`,
                   )
                 } else {
                   setSendNotice('Nic není vybráno k poslání.')
@@ -123,6 +131,19 @@ function Room() {
               Převzít
             </button>
           )}
+          <label className="k-dead-switch">
+            <input
+              type="checkbox"
+              checked={active.profile.character.dead}
+              onChange={(event) =>
+                updateCharacter(active.profile.id, {
+                  ...active.profile.character,
+                  dead: event.target.checked,
+                })
+              }
+            />
+            Mrtvý
+          </label>
           <button
             type="button"
             className="k-app-action k-app-action-warn"

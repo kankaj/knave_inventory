@@ -8,12 +8,15 @@ export type NumberInputProps = {
   min?: number
   max?: number
   'aria-label'?: string
+  'aria-describedby'?: string
 }
 
 /**
  * A number field that can be emptied while typing. Committing on every
  * keystroke would reject the empty string as NaN and snap the old number
- * back, which makes clear-and-retype append instead of replace.
+ * back, which makes clear-and-retype append instead of replace. Anything
+ * outside the range is rewritten to the nearest allowed number as it is
+ * typed, so a bonus of 11 can never end up on the sheet.
  */
 export function NumberInput({
   id,
@@ -23,6 +26,7 @@ export function NumberInput({
   min,
   max,
   'aria-label': ariaLabel,
+  'aria-describedby': describedBy,
 }: NumberInputProps) {
   const [draft, setDraft] = useState(() => String(value))
   const [committed, setCommitted] = useState(value)
@@ -41,63 +45,46 @@ export function NumberInput({
       min={min}
       max={max}
       aria-label={ariaLabel}
+      aria-describedby={describedBy}
       value={draft}
       onChange={(event) => {
         const raw = event.target.value
-        setDraft(raw)
         const parsed = Number.parseInt(raw, 10)
-        if (Number.isNaN(parsed)) return
+        if (Number.isNaN(parsed)) {
+          setDraft(raw)
+          return
+        }
         const floored = min === undefined ? parsed : Math.max(min, parsed)
-        onChange(max === undefined ? floored : Math.min(max, floored))
+        const bounded = max === undefined ? floored : Math.min(max, floored)
+        setDraft(bounded === parsed ? raw : String(bounded))
+        onChange(bounded)
       }}
       onBlur={() => setDraft(String(value))}
     />
   )
 }
 
-export function Wordmark({ edition = 'Druhá edice' }: { edition?: string }) {
-  return (
-    <div className="k-wordmark">
-      <span className="k-wordmark-name">Knave</span>
-      <span className="k-wordmark-edition">{edition}</span>
-    </div>
-  )
-}
-
-export type InkFieldProps = {
-  label: string
+export type NameMarkProps = {
   value: string
   onChange: (value: string) => void
-  placeholder?: string
   /** Struck through, for the name of a dead character. */
   struck?: boolean
 }
 
-/** A label over a dotted writing line, like JMÉNO or POVOLÁNÍ. */
-export function InkField({
-  label,
-  value,
-  onChange,
-  placeholder,
-  struck = false,
-}: InkFieldProps) {
-  const id = useId()
+/**
+ * The character's name written where the logo used to sit, in the same
+ * blackletter face. It doubles as the sheet's only name field.
+ */
+export function NameMark({ value, onChange, struck = false }: NameMarkProps) {
   return (
-    <div className="k-field">
-      <label className="k-label" htmlFor={id}>
-        {label}
-      </label>
-      <div className="k-field-rule">
-        <input
-          id={id}
-          className="k-input"
-          data-struck={struck}
-          value={value}
-          placeholder={placeholder}
-          onChange={(event) => onChange(event.target.value)}
-        />
-      </div>
-    </div>
+    <input
+      className="k-namemark"
+      aria-label="Jméno"
+      data-struck={struck}
+      value={value}
+      placeholder="Jméno"
+      onChange={(event) => onChange(event.target.value)}
+    />
   )
 }
 
@@ -105,10 +92,11 @@ export type HexFieldProps = {
   label: string
   value: number
   onChange: (value: number) => void
+  min?: number
 }
 
-/** A hexagon stat, like TZ or BZ. */
-export function HexField({ label, value, onChange }: HexFieldProps) {
+/** A hexagon stat. Numbers only, like ŠTÍT. */
+export function HexField({ label, value, onChange, min = 0 }: HexFieldProps) {
   const id = useId()
   return (
     <div className="k-hex">
@@ -121,6 +109,7 @@ export function HexField({ label, value, onChange }: HexFieldProps) {
             id={id}
             className="k-hex-input"
             value={value}
+            min={min}
             onChange={onChange}
           />
         </div>
@@ -170,59 +159,26 @@ export function RibbonField({
   )
 }
 
-export type PortraitFrameProps = {
-  src?: string
-  alt?: string
-  /**
-   * Omit to render a read-only frame. Takes an image address rather than an
-   * upload: the sheet is stored in shared room metadata, which is far too
-   * small to hold an encoded image.
-   */
-  onUrlChange?: (url: string) => void
+export type NotesFieldProps = {
+  value: string
+  onChange: (value: string) => void
 }
 
-export function PortraitFrame({ src, alt, onUrlChange }: PortraitFrameProps) {
+/** Plain scratch space beside the vitals. */
+export function NotesField({ value, onChange }: NotesFieldProps) {
   const id = useId()
-  const [broken, setBroken] = useState(false)
-  const showImage = Boolean(src) && !broken
-
   return (
-    <div className="k-portrait">
-      <span className="k-label">Portrét</span>
-      <div className="k-portrait-frame">
-        {showImage ? (
-          <img
-            className="k-portrait-img"
-            src={src}
-            alt={alt ?? ''}
-            onError={() => setBroken(true)}
-          />
-        ) : (
-          <span className="k-portrait-empty">
-            {broken
-              ? 'Obrázek se nepodařilo načíst'
-              : onUrlChange
-                ? 'Vlož odkaz na obrázek'
-                : 'Bez portrétu'}
-          </span>
-        )}
-      </div>
-      {onUrlChange && (
-        <div className="k-field-rule">
-          <input
-            id={id}
-            className="k-input k-portrait-url"
-            type="url"
-            value={src ?? ''}
-            placeholder="https://…"
-            aria-label="Odkaz na portrét"
-            onChange={(event) => {
-              setBroken(false)
-              onUrlChange(event.target.value)
-            }}
-          />
-        </div>
-      )}
+    <div className="k-notes">
+      <label className="k-label" htmlFor={id}>
+        Poznámky
+      </label>
+      <textarea
+        id={id}
+        className="k-notes-area"
+        value={value}
+        placeholder="Cokoli si chceš zapsat"
+        onChange={(event) => onChange(event.target.value)}
+      />
     </div>
   )
 }

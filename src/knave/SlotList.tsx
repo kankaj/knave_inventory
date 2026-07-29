@@ -5,17 +5,22 @@ export type SlotListProps = {
   /** Rows past this are printed but struck through. */
   capacity: number
   onSlotChange: (index: number, text: string) => void
+  onNoteChange: (index: number, note: string) => void
   onWoundToggle: (index: number) => void
   /** Rows picked for sending. Omit to hide the send checkboxes entirely. */
   selected?: readonly number[]
   onSelectToggle?: (index: number) => void
 }
 
-/** The numbered rows: carried items and wounds share the same capacity. */
+/**
+ * The numbered rows in one column: carried items and wounds share the same
+ * capacity, and every row carries a note written beside it.
+ */
 export function SlotList({
   slots,
   capacity,
   onSlotChange,
+  onNoteChange,
   onWoundToggle,
   selected,
   onSelectToggle,
@@ -62,6 +67,13 @@ export function SlotList({
                 value={slot.text}
                 aria-label={`Řádek ${index + 1}${beyond ? ' (nad kapacitu)' : ''}`}
                 onChange={(event) => onSlotChange(index, event.target.value)}
+              />
+              <input
+                className="k-input k-slot-note"
+                value={slot.note}
+                placeholder="Poznámka"
+                aria-label={`Poznámka k řádku ${index + 1}`}
+                onChange={(event) => onNoteChange(index, event.target.value)}
               />
               <button
                 type="button"
