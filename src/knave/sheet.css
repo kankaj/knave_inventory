@@ -466,8 +466,9 @@
   min-width: 0;
 }
 
-/* A fixed writing space, dragged taller by hand if wanted. It does not follow
-   the health track. */
+/* A writing space of one fixed size: it neither follows the health track nor
+   gets dragged about, so nothing else on the sheet moves because of it. Long
+   notes scroll inside it. */
 .k-notes-area {
   flex: 0 0 auto;
   width: 100%;
@@ -478,7 +479,7 @@
   background: var(--paper-hi);
   color: var(--ink);
   font: inherit;
-  resize: vertical;
+  resize: none;
 }
 
 .k-notes-area::placeholder {
@@ -1140,8 +1141,9 @@
     border-left: 0;
   }
 
+  /* Stacked on a narrow popover the sheet is long enough already. */
   .k-notes-area {
-    min-height: 90px;
+    height: 130px;
   }
 
   /* The note drops under its item rather than shrinking to nothing. */
