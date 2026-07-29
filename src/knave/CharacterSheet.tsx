@@ -3,7 +3,7 @@ import { AbilityDial } from './AbilityDial'
 import { HealthPennant } from './HealthPennant'
 import { SendPanel, type SendTarget } from './SendPanel'
 import { SlotList } from './SlotList'
-import { HexField, NameMark, NotesField, RibbonField } from './fields'
+import { NameMark, NotesField, RibbonField, ShieldField } from './fields'
 import { ABILITIES, slotCapacity, type Character } from './types'
 import './sheet.css'
 
@@ -69,8 +69,8 @@ export function CharacterSheet({
 
           <div className="k-vitals">
             <div className="k-vitals-stack">
-              <HexField
-                label="Štít"
+              <ShieldField
+                label="Brnění"
                 value={character.shield}
                 onChange={(shield) => patch({ shield })}
               />
@@ -87,20 +87,25 @@ export function CharacterSheet({
                 }
               />
             </div>
-            <NotesField
-              value={character.notes}
-              onChange={(notes) => patch({ notes })}
-            />
-          </div>
+            {/* The notes keep their own height whatever the health track does,
+                and the send table lines up with them, not with the whole
+                column. */}
+            <div className="k-vitals-side">
+              <NotesField
+                value={character.notes}
+                onChange={(notes) => patch({ notes })}
+              />
 
-          {sending && (
-            <SendPanel
-              selectedCount={selected.length}
-              targets={sendTargets}
-              notice={sendNotice}
-              onSend={(targetId) => onSend(targetId, selected)}
-            />
-          )}
+              {sending && (
+                <SendPanel
+                  selectedCount={selected.length}
+                  targets={sendTargets}
+                  notice={sendNotice}
+                  onSend={(targetId) => onSend(targetId, selected)}
+                />
+              )}
+            </div>
+          </div>
         </div>
 
         <div className="k-sheet-right">

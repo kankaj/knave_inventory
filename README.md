@@ -109,7 +109,7 @@ later without touching them.
 | Component        | Sheet element                                           |
 | ---------------- | ------------------------------------------------------- |
 | `NameMark`       | The name, written in the blackletter face of the logo   |
-| `HexField`       | Hexagon stat (ŠTÍT), numbers only                       |
+| `ShieldField`    | BRNĚNÍ written inside a shield, numbers only            |
 | `RibbonField`    | ÚROVEŇ / ZK banner with the notched edge                |
 | `NotesField`     | Free-form scratch space beside the vitals               |
 | `NumberInput`    | Numeric field that can be emptied while typing          |

@@ -107,7 +107,7 @@ export const InPopover: Story = {
     await expect(canvas.getByLabelText('Jméno')).toHaveValue(
       'Jarmila Hrdlořezná',
     )
-    await expect(canvas.getByLabelText('Štít')).toHaveValue(2)
+    await expect(canvas.getByLabelText('Brnění')).toHaveValue(2)
     await expect(canvas.getByText('5/9')).toBeVisible()
     // Odolnost 2 → 12 usable rows.
     await expect(canvas.getByText('8/12')).toBeVisible()

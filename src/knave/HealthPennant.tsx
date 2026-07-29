@@ -35,7 +35,7 @@ export function HealthPennant({
       <div className="k-pennant-max">
         <NumberInput
           id={maxId}
-          className="k-hex-input"
+          className="k-num-input"
           value={max}
           min={1}
           onChange={onMaxChange}

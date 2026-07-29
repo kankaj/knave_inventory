@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import type { Meta, StoryObj } from '@storybook/react-vite'
 import { expect, userEvent } from 'storybook/test'
-import { HexField, NameMark, NotesField, RibbonField } from './fields'
+import { NameMark, NotesField, RibbonField, ShieldField } from './fields'
 import './sheet.css'
 
 const meta = {
@@ -26,7 +26,7 @@ function NameHarness({ struck = false }: { struck?: boolean }) {
 
 function ShieldHarness() {
   const [shield, setShield] = useState(2)
-  return <HexField label="Štít" value={shield} onChange={setShield} />
+  return <ShieldField label="Brnění" value={shield} onChange={setShield} />
 }
 
 function RibbonHarness() {
@@ -71,7 +71,7 @@ export const NameOfTheDead: Story = {
 export const Shield: Story = {
   render: () => <ShieldHarness />,
   play: async ({ canvas }) => {
-    const shield = canvas.getByLabelText('Štít')
+    const shield = canvas.getByLabelText('Brnění')
     await expect(shield).toHaveAttribute('type', 'number')
     // Clear and retype must replace, not append.
     await userEvent.clear(shield)

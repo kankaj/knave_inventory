@@ -88,26 +88,34 @@ export function NameMark({ value, onChange, struck = false }: NameMarkProps) {
   )
 }
 
-export type HexFieldProps = {
+export type ShieldFieldProps = {
   label: string
   value: number
   onChange: (value: number) => void
   min?: number
 }
 
-/** A hexagon stat. Numbers only, like ŠTÍT. */
-export function HexField({ label, value, onChange, min = 0 }: HexFieldProps) {
+/**
+ * A stat written inside a shield, for BRNĚNÍ. The shield is the field itself:
+ * the number is typed straight into it, not beside a decorative icon.
+ */
+export function ShieldField({
+  label,
+  value,
+  onChange,
+  min = 0,
+}: ShieldFieldProps) {
   const id = useId()
   return (
-    <div className="k-hex">
+    <div className="k-shield">
       <label className="k-label" htmlFor={id}>
         {label}
       </label>
-      <div className="k-hex-body">
-        <div className="k-hex-inner">
+      <div className="k-shield-body">
+        <div className="k-shield-inner">
           <NumberInput
             id={id}
-            className="k-hex-input"
+            className="k-num-input k-shield-input"
             value={value}
             min={min}
             onChange={onChange}
