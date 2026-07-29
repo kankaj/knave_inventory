@@ -92,6 +92,15 @@ export function CharacterSheet({
               onChange={(notes) => patch({ notes })}
             />
           </div>
+
+          {sending && (
+            <SendPanel
+              selectedCount={selected.length}
+              targets={sendTargets}
+              notice={sendNotice}
+              onSend={(targetId) => onSend(targetId, selected)}
+            />
+          )}
         </div>
 
         <div className="k-sheet-right">
@@ -132,15 +141,6 @@ export function CharacterSheet({
               patch({ slots })
             }}
           />
-
-          {sending && (
-            <SendPanel
-              selectedCount={selected.length}
-              targets={sendTargets}
-              notice={sendNotice}
-              onSend={(targetId) => onSend(targetId, selected)}
-            />
-          )}
         </div>
       </div>
     </div>

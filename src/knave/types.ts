@@ -99,7 +99,7 @@ export type Character = {
   abilities: Record<AbilityKey, number>
   /** Always SLOT_COUNT entries, items and wounds alike. */
   slots: Slot[]
-  /** Struck through on the sheet and in the tab strip. Cannot receive items. */
+  /** Struck through on the sheet and in the column. Cannot receive items. */
   dead: boolean
 }
 
@@ -136,6 +136,8 @@ export type Profile = {
   ownerId: string
   /** Last known name of the owner, used to re-find a sheet from a new device. */
   ownerName: string
+  /** Epoch millis the sheet was started. Fixes its place in the sidebar. */
+  createdAt: number
   character: Character
 }
 
@@ -144,6 +146,7 @@ export function createProfile(overrides: Partial<Profile> = {}): Profile {
     id: newProfileId(),
     ownerId: '',
     ownerName: '',
+    createdAt: Date.now(),
     character: createCharacter({ name: overrides.ownerName ?? '' }),
     ...overrides,
   }
@@ -163,6 +166,9 @@ export function normalizeProfile(raw: unknown, fallbackId: string): Profile {
     id: typeof input?.id === 'string' && input.id ? input.id : fallbackId,
     ownerId: typeof input?.ownerId === 'string' ? input.ownerId : '',
     ownerName: typeof input?.ownerName === 'string' ? input.ownerName : '',
+    // Sheets written before the sidebar carry no timestamp; treat them as the
+    // oldest ones, which is where they belong anyway.
+    createdAt: number(input?.createdAt, 0),
     character: normalizeCharacter(input?.character),
   }
 }

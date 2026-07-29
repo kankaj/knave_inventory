@@ -65,13 +65,39 @@ steps:
    claimed automatically.
 3. Failing both, press **Převzít** on any sheet to take it over.
 
-Sheets whose owner has left stay in the tab strip marked *pryč*, and **+ list**
-creates an extra sheet (a familiar, an NPC, a second character).
+Sheets whose owner has left stay in the column marked *pryč*, and **+ nový
+deník** creates an extra sheet (a familiar, an NPC, a second character). The
+column is grouped by owner and, within one owner, ordered oldest sheet first, so
+nothing moves around as sheets are edited or renamed. The button in the top
+right corner collapses it.
 
 Keystrokes are batched for 350 ms before writing, and pending local edits win
 over incoming room updates until the room echoes them back. Profiles are read
-through `normalizeProfile`, so a stale or hand-edited metadata entry cannot
+through `unpackProfile`, which falls back to `normalizeProfile` for anything
+written by an older version, so a stale or hand-edited metadata entry cannot
 break rendering.
+
+## Keeping the sheets between sessions
+
+Room metadata is capped at **16 kB for the whole room**, shared with every other
+extension the table runs. Sheets are therefore written packed
+(`src/knave/codec.ts`): single-letter keys, no value that equals the default, and
+only the item rows actually in use — roughly a tenth of the plain size. Every
+write is measured against `ROOM_BUDGET_BYTES` first, and a write that would not
+fit is refused with a notice on screen instead of being rejected silently by
+Owlbear, which is how sheets used to lose their contents.
+
+Metadata still lives and dies with the room, so each browser also keeps its own
+snapshot in `localStorage` under `knave-inventory/backup/<roomId>`, refreshed on
+every room update (`src/knave/backup.ts`). If the table comes back to a room that
+has lost **every** sheet, the first browser to open the extension pushes its
+snapshot back and says so. A room that still holds sheets is left alone — it is
+the newer truth, and restoring into it would resurrect sheets that were deleted
+on purpose.
+
+For a copy that outlives the browser as well, **Stáhnout zálohu** writes the
+whole room to a JSON file and **Načíst zálohu** merges one back in, overwriting
+sheets that carry the same id.
 
 ## Sheet components
 
@@ -109,7 +135,7 @@ item column and its notes on the right, with ÚROVEŇ / ZK at the top right.
   text, and counts against capacity exactly like carried gear, so a hurt
   character carries less.
 - **Death is a manual switch.** The *Mrtvý* toggle, at the bottom beside
-  *Vymazat*, strikes the name through on the sheet and in the tab strip. Nothing
+  *Vymazat*, strikes the name through on the sheet and in the column. Nothing
   flips it automatically — wounds filling every row do not kill anyone by
   themselves.
 - **The dead only give.** A dead character can still hand things over, but is

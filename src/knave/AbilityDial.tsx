@@ -1,4 +1,4 @@
-import { useId } from 'react'
+import { useId, type CSSProperties } from 'react'
 import { NumberInput } from './fields'
 import {
   ABILITY_MAX,
@@ -27,7 +27,12 @@ export function AbilityDial({ ability, value, onChange }: AbilityDialProps) {
       <label className="k-dial-name" htmlFor={id}>
         {ability.name}
       </label>
-      <div className="k-dial-ring">
+      {/* The number is as wide as it has digits, so the sign and the number
+          together stay centred in the ring for +5 as well as +10. */}
+      <div
+        className="k-dial-ring"
+        style={{ '--digits': String(value).length } as CSSProperties}
+      >
         <span className="k-dial-def" title={`Obrana ${abilityDefense(value)}`}>
           {abilityDefense(value)}
         </span>

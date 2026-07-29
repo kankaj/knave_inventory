@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import OBR from '@owlbear-rodeo/sdk'
 import { CharacterSheet } from './knave/CharacterSheet'
-import { ProfileTabs } from './knave/ProfileTabs'
+import { ProfileSidebar } from './knave/ProfileSidebar'
 import { useProfiles } from './knave/storage'
 import { freeRows } from './knave/transfer'
 import './knave/sheet.css'
@@ -29,20 +29,47 @@ function App() {
   return <Room />
 }
 
+/** Remembers whether the column was left open, per browser. */
+const SIDEBAR_KEY = 'knave-inventory/sidebar-open'
+
+function recallSidebar(): boolean {
+  try {
+    return localStorage.getItem(SIDEBAR_KEY) !== 'closed'
+  } catch {
+    return true
+  }
+}
+
 /** Mounted only after the SDK is ready, so every hook below can call it. */
 function Room() {
   const {
     entries,
     selfProfileId,
     loaded,
+    notice,
+    dismissNotice,
     updateCharacter,
     claimProfile,
     addProfile,
     deleteProfile,
     sendBetween,
+    exportProfiles,
+    importProfiles,
   } = useProfiles()
   const [selectedId, setSelectedId] = useState('')
   const [sendNotice, setSendNotice] = useState('')
+  const [sidebarOpen, setSidebarOpen] = useState(recallSidebar)
+
+  const toggleSidebar = () => {
+    setSidebarOpen((open) => {
+      try {
+        localStorage.setItem(SIDEBAR_KEY, open ? 'closed' : 'open')
+      } catch {
+        // Only the remembered preference is lost.
+      }
+      return !open
+    })
+  }
 
   const active =
     entries.find((entry) => entry.profile.id === selectedId) ??
@@ -68,90 +95,136 @@ function Room() {
       freeRows: freeRows(entry.profile.character),
     }))
 
+  const downloadBackup = () => {
+    const url = URL.createObjectURL(
+      new Blob([exportProfiles()], { type: 'application/json' }),
+    )
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `knave-deniky-${OBR.room.id}.json`
+    link.click()
+    URL.revokeObjectURL(url)
+  }
+
   return (
-    <div className="k-app">
-      <div className="k-app-tabs">
-        <ProfileTabs
-          entries={entries}
-          activeId={active.profile.id}
-          onSelect={setSelectedId}
-          onAdd={() => {
-            void addProfile().then((id) => id && setSelectedId(id))
-          }}
-        />
-      </div>
+    <div className="k-app" data-side={sidebarOpen}>
+      {sidebarOpen && (
+        <aside className="k-app-side" aria-label="Seznam deníků">
+          <ProfileSidebar
+            entries={entries}
+            activeId={active.profile.id}
+            onSelect={setSelectedId}
+            onAdd={() => {
+              void addProfile().then((id) => id && setSelectedId(id))
+            }}
+            onExport={downloadBackup}
+            onImport={(file) => {
+              void file.text().then((raw) => void importProfiles(raw))
+            }}
+          />
+        </aside>
+      )}
 
-      <div className="k-app-sheet">
-        <CharacterSheet
-          character={active.profile.character}
-          onChange={(next) => updateCharacter(active.profile.id, next)}
-          sendNotice={sendNotice}
-          sendTargets={sendTargets}
-          onSend={(targetId, indices) => {
-            setSendNotice('')
-            void sendBetween(active.profile.id, targetId, indices).then(
-              (result) => {
-                const target = entries.find(
-                  (entry) => entry.profile.id === targetId,
-                )
-                if (result.ok) {
-                  setSendNotice(
-                    `Posláno ${target?.displayName ?? ''}: ${result.moved.join(', ')}`,
-                  )
-                } else if (result.reason === 'no-room') {
-                  setSendNotice(
-                    `${target?.displayName ?? 'Příjemce'} má volno jen ${result.free} — posíláš ${result.needed}.`,
-                  )
-                } else if (result.reason === 'recipient-dead') {
-                  setSendNotice(
-                    `${target?.displayName ?? 'Příjemce'} je mrtvý a nemůže nic přijmout.`,
-                  )
-                } else {
-                  setSendNotice('Nic není vybráno k poslání.')
-                }
-              },
-            )
-          }}
-        />
-      </div>
+      <div className="k-app-main">
+        <div className="k-app-bar">
+          <button
+            type="button"
+            className="k-app-action k-side-toggle"
+            aria-expanded={sidebarOpen}
+            onClick={toggleSidebar}
+            title={
+              sidebarOpen ? 'Zavřít seznam deníků' : 'Otevřít seznam deníků'
+            }
+          >
+            {sidebarOpen ? '⟨ deníky' : '☰ deníky'}
+          </button>
+        </div>
 
-      <div className="k-app-foot">
-        <span className="k-app-note">
-          {active.isSelf
-            ? 'Tvůj list. Vidí ho a může upravovat kdokoli v místnosti.'
-            : `List hráče ${active.displayName}. Úpravy vidí všichni.`}
-        </span>
-        <span className="k-app-actions">
-          {!active.isSelf && (
+        {notice && (
+          <p className="k-app-notice" role="status">
+            <span>{notice}</span>
             <button
               type="button"
               className="k-app-action"
-              onClick={() => void claimProfile(active.profile.id)}
+              onClick={dismissNotice}
             >
-              Převzít
+              OK
             </button>
-          )}
-          <label className="k-dead-switch">
-            <input
-              type="checkbox"
-              checked={active.profile.character.dead}
-              onChange={(event) =>
-                updateCharacter(active.profile.id, {
-                  ...active.profile.character,
-                  dead: event.target.checked,
-                })
-              }
-            />
-            Mrtvý
-          </label>
-          <button
-            type="button"
-            className="k-app-action k-app-action-warn"
-            onClick={() => void deleteProfile(active.profile.id)}
-          >
-            Vymazat
-          </button>
-        </span>
+          </p>
+        )}
+
+        <div className="k-app-sheet">
+          <CharacterSheet
+            character={active.profile.character}
+            onChange={(next) => updateCharacter(active.profile.id, next)}
+            sendNotice={sendNotice}
+            sendTargets={sendTargets}
+            onSend={(targetId, indices) => {
+              setSendNotice('')
+              void sendBetween(active.profile.id, targetId, indices).then(
+                (result) => {
+                  const target = entries.find(
+                    (entry) => entry.profile.id === targetId,
+                  )
+                  if (result.ok) {
+                    setSendNotice(
+                      `Posláno ${target?.displayName ?? ''}: ${result.moved.join(', ')}`,
+                    )
+                  } else if (result.reason === 'no-room') {
+                    setSendNotice(
+                      `${target?.displayName ?? 'Příjemce'} má volno jen ${result.free} — posíláš ${result.needed}.`,
+                    )
+                  } else if (result.reason === 'recipient-dead') {
+                    setSendNotice(
+                      `${target?.displayName ?? 'Příjemce'} je mrtvý a nemůže nic přijmout.`,
+                    )
+                  } else {
+                    setSendNotice('Nic není vybráno k poslání.')
+                  }
+                },
+              )
+            }}
+          />
+        </div>
+
+        <div className="k-app-foot">
+          <span className="k-app-note">
+            {active.isSelf
+              ? 'Tvůj list. Vidí ho a může upravovat kdokoli v místnosti.'
+              : `List hráče ${active.displayName}. Úpravy vidí všichni.`}
+          </span>
+          <span className="k-app-actions">
+            {!active.isSelf && (
+              <button
+                type="button"
+                className="k-app-action"
+                onClick={() => void claimProfile(active.profile.id)}
+              >
+                Převzít
+              </button>
+            )}
+            <label className="k-dead-switch">
+              <input
+                type="checkbox"
+                checked={active.profile.character.dead}
+                onChange={(event) =>
+                  updateCharacter(active.profile.id, {
+                    ...active.profile.character,
+                    dead: event.target.checked,
+                  })
+                }
+              />
+              Mrtvý
+            </label>
+            <button
+              type="button"
+              className="k-app-action k-app-action-warn"
+              onClick={() => void deleteProfile(active.profile.id)}
+            >
+              Vymazat
+            </button>
+          </span>
+        </div>
       </div>
     </div>
   )

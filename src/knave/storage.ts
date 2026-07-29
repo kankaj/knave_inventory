@@ -1,13 +1,22 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import OBR, { type Player } from '@owlbear-rodeo/sdk'
-import { chooseProfile } from './identity'
-import { sendItems, type SendResult } from './transfer'
 import {
-  createProfile,
-  normalizeProfile,
-  type Character,
-  type Profile,
-} from './types'
+  loadSnapshot,
+  parseSnapshot,
+  profilesToRestore,
+  saveSnapshot,
+  serializeSnapshot,
+} from './backup'
+import {
+  ROOM_BUDGET_BYTES,
+  jsonBytes,
+  packProfile,
+  unpackProfile,
+} from './codec'
+import { chooseProfile } from './identity'
+import { compareProfiles } from './ordering'
+import { sendItems, type SendResult } from './transfer'
+import { createProfile, type Character, type Profile } from './types'
 
 /**
  * One room-metadata key per profile. Owlbear merges metadata by top-level key,
@@ -44,7 +53,7 @@ function readProfiles(metadata: Record<string, unknown>): ProfileMap {
     if (!key.startsWith(METADATA_PREFIX)) continue
     if (!value || typeof value !== 'object') continue
     const id = key.slice(METADATA_PREFIX.length)
-    profiles[id] = normalizeProfile(value, id)
+    profiles[id] = unpackProfile(value, id)
   }
   return profiles
 }
@@ -81,37 +90,86 @@ export function useProfiles() {
   const [players, setPlayers] = useState<Player[]>([])
   const [self, setSelf] = useState<Self | undefined>(undefined)
   const [loaded, setLoaded] = useState(false)
-  const [roomId, setRoomId] = useState('')
+  const [notice, setNotice] = useState('')
+  // The room id is there as soon as the SDK is ready, which is before this hook
+  // ever runs, so it needs no state of its own.
+  const roomId = OBR.room.id
 
   // Characters edited locally that the room has not echoed back yet.
   const pending = useRef(new Map<string, Character>())
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
   const claimed = useRef(false)
+  const restored = useRef(false)
+  // Everything in the room's metadata, ours and other extensions' alike. Needed
+  // to tell whether the next write still fits the 16 kB the room allows.
+  const roomMetadata = useRef<Record<string, unknown>>({})
+  // Read before the first write, so an empty room cannot overwrite the snapshot
+  // we may still have to restore from.
+  const [snapshot] = useState(() => loadSnapshot(roomId))
+
+  /**
+   * Write to the room, but never blindly: over the cap Owlbear rejects the
+   * whole update, and a rejection nobody reports is data quietly disappearing.
+   */
+  const writeMetadata = useCallback(
+    async (patch: Record<string, unknown>): Promise<boolean> => {
+      const merged: Record<string, unknown> = {
+        ...roomMetadata.current,
+        ...patch,
+      }
+      for (const [key, value] of Object.entries(merged)) {
+        if (value === undefined) delete merged[key]
+      }
+      if (jsonBytes(merged) > ROOM_BUDGET_BYTES) {
+        setNotice(
+          'Místnost je plná — Owlbear dá extenzi jen 16 kB. Stáhni si zálohu a vymaž staré deníky, jinak se změny neuloží.',
+        )
+        return false
+      }
+      try {
+        await OBR.room.setMetadata(patch)
+        roomMetadata.current = merged
+        return true
+      } catch (error) {
+        setNotice(
+          `Uložení do místnosti selhalo: ${error instanceof Error ? error.message : String(error)}`,
+        )
+        return false
+      }
+    },
+    [],
+  )
 
   const flush = useCallback(async () => {
     if (pending.current.size === 0) return
     const batch = new Map(pending.current)
-    const patch: Record<string, Profile> = {}
+    const patch: Record<string, unknown> = {}
     setProfiles((current) => {
       for (const [profileId, character] of batch) {
         const profile = current[profileId]
-        if (profile) patch[profileKey(profileId)] = { ...profile, character }
+        if (profile) {
+          patch[profileKey(profileId)] = packProfile({ ...profile, character })
+        }
       }
       return current
     })
-    if (Object.keys(patch).length > 0) await OBR.room.setMetadata(patch)
+    if (Object.keys(patch).length === 0) return
+    // Keep the queued keystrokes when the write was refused: they are then the
+    // only copy of what was typed, and the notice tells the table why.
+    if (!(await writeMetadata(patch))) return
     for (const [profileId, character] of batch) {
       if (pending.current.get(profileId) === character) {
         pending.current.delete(profileId)
       }
     }
-  }, [])
+  }, [writeMetadata])
 
   useEffect(() => {
     let active = true
 
     const applyMetadata = (metadata: Record<string, unknown>) => {
       if (!active) return
+      roomMetadata.current = metadata
       const remote = readProfiles(metadata)
       // Local edits win until the room confirms them.
       for (const [profileId, character] of pending.current) {
@@ -120,6 +178,10 @@ export function useProfiles() {
       }
       setProfiles(remote)
       setLoaded(true)
+      // Keep this browser's copy of the room current, so the sheets outlive the
+      // room itself between sessions.
+      const list = Object.values(remote)
+      if (list.length > 0) saveSnapshot(roomId, list)
     }
 
     const applySelf = async () => {
@@ -132,7 +194,6 @@ export function useProfiles() {
       if (active) setSelf({ id, name, role, color })
     }
 
-    setRoomId(OBR.room.id)
     void OBR.room.getMetadata().then(applyMetadata)
     void OBR.party.getPlayers().then((party) => active && setPlayers(party))
     void applySelf()
@@ -149,7 +210,7 @@ export function useProfiles() {
       unsubscribeParty()
       unsubscribeSelf()
     }
-  }, [])
+  }, [roomId])
 
   useEffect(() => {
     // Do not lose the last keystrokes when the popover closes.
@@ -159,10 +220,27 @@ export function useProfiles() {
     }
   }, [flush])
 
-  const writeProfile = useCallback(async (profile: Profile) => {
-    setProfiles((current) => ({ ...current, [profile.id]: profile }))
-    await OBR.room.setMetadata({ [profileKey(profile.id)]: profile })
-  }, [])
+  const writeProfiles = useCallback(
+    async (list: readonly Profile[]): Promise<boolean> => {
+      if (list.length === 0) return true
+      setProfiles((current) => {
+        const next = { ...current }
+        for (const profile of list) next[profile.id] = profile
+        return next
+      })
+      const patch: Record<string, unknown> = {}
+      for (const profile of list) {
+        patch[profileKey(profile.id)] = packProfile(profile)
+      }
+      return writeMetadata(patch)
+    },
+    [writeMetadata],
+  )
+
+  const writeProfile = useCallback(
+    async (profile: Profile) => writeProfiles([profile]),
+    [writeProfiles],
+  )
 
   const claimProfile = useCallback(
     async (profileId: string) => {
@@ -187,10 +265,29 @@ export function useProfiles() {
     return profile.id
   }, [roomId, self, writeProfile])
 
+  // A room that came back empty gets its sheets pushed back from this browser's
+  // snapshot, before anybody starts a fresh sheet on top of the loss.
+  useEffect(() => {
+    if (!loaded || restored.current) return
+    restored.current = true
+    const missing = profilesToRestore(snapshot.profiles, profiles)
+    if (missing.length === 0) return
+    void writeProfiles(missing).then((ok) => {
+      if (ok) {
+        setNotice(
+          `Místnost byla prázdná — obnoveno ${missing.length} deníků z místní zálohy.`,
+        )
+      }
+    })
+  }, [loaded, profiles, snapshot, writeProfiles])
+
   // Re-attach this player to their sheet. The decision itself lives in
   // chooseProfile so it can be tested without a live room.
   useEffect(() => {
     if (!loaded || !self || claimed.current) return
+    // Wait for the restore pass: without it the restored sheets are invisible
+    // to the matching below and everyone would start over on a new sheet.
+    if (!restored.current) return
     claimed.current = true
 
     const choice = chooseProfile({
@@ -243,34 +340,56 @@ export function useProfiles() {
       const result = sendItems(from.character, to.character, indices)
       if (!result.ok) return result
 
-      const nextFrom = { ...from, character: result.from }
-      const nextTo = { ...to, character: result.to }
       // Drop queued keystrokes for both sheets; the transfer supersedes them.
       pending.current.delete(fromId)
       pending.current.delete(toId)
-      setProfiles((current) => ({
-        ...current,
-        [fromId]: nextFrom,
-        [toId]: nextTo,
-      }))
-      await OBR.room.setMetadata({
-        [profileKey(fromId)]: nextFrom,
-        [profileKey(toId)]: nextTo,
-      })
+      await writeProfiles([
+        { ...from, character: result.from },
+        { ...to, character: result.to },
+      ])
       return result
     },
+    [profiles, writeProfiles],
+  )
+
+  const deleteProfile = useCallback(
+    async (profileId: string) => {
+      pending.current.delete(profileId)
+      const remaining: Profile[] = []
+      setProfiles((current) => {
+        const next = { ...current }
+        delete next[profileId]
+        remaining.push(...Object.values(next))
+        return next
+      })
+      // Take it out of the snapshot as well, or the next reconnect into an
+      // emptied room would restore the sheet the table just deleted.
+      saveSnapshot(roomId, remaining)
+      await writeMetadata({ [profileKey(profileId)]: undefined })
+    },
+    [roomId, writeMetadata],
+  )
+
+  /** The whole room as a file the table can keep outside Owlbear. */
+  const exportProfiles = useCallback(
+    () => serializeSnapshot(Object.values(profiles)),
     [profiles],
   )
 
-  const deleteProfile = useCallback(async (profileId: string) => {
-    pending.current.delete(profileId)
-    setProfiles((current) => {
-      const next = { ...current }
-      delete next[profileId]
-      return next
-    })
-    await OBR.room.setMetadata({ [profileKey(profileId)]: undefined })
-  }, [])
+  /** Merge an exported file back in. Sheets with the same id are overwritten. */
+  const importProfiles = useCallback(
+    async (raw: string): Promise<number> => {
+      const incoming = parseSnapshot(raw)
+      if (incoming.profiles.length === 0) {
+        setNotice('V souboru nejsou žádné deníky.')
+        return 0
+      }
+      if (!(await writeProfiles(incoming.profiles))) return 0
+      setNotice(`Načteno ${incoming.profiles.length} deníků ze souboru.`)
+      return incoming.profiles.length
+    },
+    [writeProfiles],
+  )
 
   const entries: ProfileEntry[] = useMemo(() => {
     const list = Object.values(profiles).map((profile) => {
@@ -291,25 +410,27 @@ export function useProfiles() {
         isSelf,
       }
     })
-    // Mine first, then everyone present, then sheets nobody is holding.
-    return list.sort((a, b) => {
-      if (a.isSelf !== b.isSelf) return a.isSelf ? -1 : 1
-      if (a.connected !== b.connected) return a.connected ? -1 : 1
-      return a.displayName.localeCompare(b.displayName, 'cs')
-    })
+    // Grouped by owner, oldest sheet of each owner on top.
+    return list.sort(compareProfiles)
   }, [players, profiles, self])
 
   const selfProfileId =
     entries.find((entry) => entry.isSelf)?.profile.id ?? entries[0]?.profile.id
 
+  const dismissNotice = useCallback(() => setNotice(''), [])
+
   return {
     entries,
     selfProfileId,
     loaded,
+    notice,
+    dismissNotice,
     updateCharacter,
     claimProfile,
     addProfile,
     deleteProfile,
     sendBetween,
+    exportProfiles,
+    importProfiles,
   }
 }
