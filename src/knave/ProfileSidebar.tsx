@@ -5,6 +5,8 @@ export type ProfileSidebarProps = {
   activeId: string
   onSelect: (profileId: string) => void
   onAdd: () => void
+  /** Hide the column again; it stands where the open button was. */
+  onClose: () => void
   /** Hand the room out as a file. */
   onExport: () => void
   /** Read a previously exported file back into the room. */
@@ -34,12 +36,23 @@ export function ProfileSidebar({
   activeId,
   onSelect,
   onAdd,
+  onClose,
   onExport,
   onImport,
 }: ProfileSidebarProps) {
   return (
     <div className="k-side">
-      <h2 className="k-side-title">Deníky</h2>
+      <div className="k-side-head">
+        <h2 className="k-side-title">Deníky</h2>
+        <button
+          type="button"
+          className="k-side-close"
+          aria-label="Zavřít seznam deníků"
+          onClick={onClose}
+        >
+          ✕
+        </button>
+      </div>
 
       <div className="k-side-list" role="tablist" aria-label="Deníky postav">
         {groupByOwner(entries).map((group) => (

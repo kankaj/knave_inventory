@@ -30,6 +30,13 @@
   text-rendering: optimizeLegibility;
 }
 
+/* The whole extension, shell included: a padded box that is told to be exactly
+   as tall as its parent has to stay that tall. */
+.k-app,
+.k-app *,
+.k-app *::before,
+.k-app *::after,
+.k-sheet,
 .k-sheet *,
 .k-sheet *::before,
 .k-sheet *::after {
@@ -747,8 +754,37 @@
   gap: 8px;
   height: 100%;
   padding: 10px 10px 12px;
+  overflow: hidden;
   background: #e7dcc4;
   color: #17130f;
+}
+
+/* The heading sits level with the button the column replaced, with the way back
+   out at its right end. */
+.k-side-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  min-height: 20px;
+}
+
+.k-side-close {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: 1px solid #5d5449;
+  border-radius: 5px;
+  background: transparent;
+  color: #5d5449;
+  font: 600 11px/1 'EB Garamond', serif;
+  cursor: pointer;
+}
+
+.k-side-close:hover {
+  background: color-mix(in srgb, #17130f 10%, transparent);
 }
 
 .k-side-title {
@@ -759,11 +795,14 @@
   color: #5d5449;
 }
 
+/* min-height 0 lets the list give way in a short popover, so the add and backup
+   buttons below it are never pushed off the bottom of the column. */
 .k-side-list {
   display: flex;
   flex-direction: column;
   gap: 10px;
   flex: 1 1 auto;
+  min-height: 0;
   overflow-y: auto;
   scrollbar-width: thin;
 }
@@ -900,15 +939,16 @@
 }
 
 /* The column lies over the sheet rather than pushing it sideways, so opening it
-   never reflows what is being read. It starts below the bar, which keeps the
-   toggle uncovered. */
+   never reflows what is being read. It stands exactly where the open button was
+   and is tied to the popover viewport, never to the length of the sheet — a
+   column taller than the window is what caused the drawing artefacts. */
 .k-app-side {
-  position: absolute;
-  top: var(--bar-height);
+  position: fixed;
+  top: 0;
   left: 0;
-  bottom: 0;
   z-index: 4;
   width: 176px;
+  height: 100svh;
   border-right: 2px solid #17130f;
   box-shadow: 3px 0 10px rgb(23 19 15 / 25%);
 }

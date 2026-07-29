@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import type { Meta, StoryObj } from '@storybook/react-vite'
-import { expect, userEvent } from 'storybook/test'
+import { expect, fn, userEvent } from 'storybook/test'
 import { compareProfiles } from './ordering'
 import { ProfileSidebar } from './ProfileSidebar'
 import type { ProfileEntry } from './storage'
@@ -45,6 +45,7 @@ const meta = {
     activeId: 'jarmila',
     onSelect: () => {},
     onAdd: () => {},
+    onClose: fn(),
     onExport: () => {},
     onImport: () => {},
   },
@@ -69,6 +70,7 @@ function Harness() {
       activeId={activeId}
       onSelect={setActiveId}
       onAdd={() => {}}
+      onClose={() => {}}
       onExport={() => {}}
       onImport={() => {}}
     />
@@ -119,5 +121,15 @@ export const Backup: Story = {
       canvas.getByRole('button', { name: 'Stáhnout zálohu' }),
     ).toBeVisible()
     await expect(canvas.getByText('Načíst zálohu')).toBeVisible()
+  },
+}
+
+/** The column stands where the open button was, so it carries its own way out. */
+export const CloseFromInside: Story = {
+  play: async ({ args, canvas }) => {
+    await userEvent.click(
+      canvas.getByRole('button', { name: 'Zavřít seznam deníků' }),
+    )
+    await expect(args.onClose).toHaveBeenCalled()
   },
 }

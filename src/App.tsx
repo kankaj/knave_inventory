@@ -117,6 +117,7 @@ function Room() {
             onAdd={() => {
               void addProfile().then((id) => id && setSelectedId(id))
             }}
+            onClose={toggleSidebar}
             onExport={downloadBackup}
             onImport={(file) => {
               void file.text().then((raw) => void importProfiles(raw))
@@ -126,18 +127,20 @@ function Room() {
       )}
 
       <div className="k-app-main">
+        {/* The bar keeps its height while the column covers it, so opening the
+            column never nudges the sheet. */}
         <div className="k-app-bar">
-          <button
-            type="button"
-            className="k-app-action k-side-toggle"
-            aria-expanded={sidebarOpen}
-            onClick={toggleSidebar}
-            title={
-              sidebarOpen ? 'Zavřít seznam deníků' : 'Otevřít seznam deníků'
-            }
-          >
-            {sidebarOpen ? '⟨ deníky' : '☰ deníky'}
-          </button>
+          {!sidebarOpen && (
+            <button
+              type="button"
+              className="k-app-action k-side-toggle"
+              aria-expanded={false}
+              onClick={toggleSidebar}
+              title="Otevřít seznam deníků"
+            >
+              ☰ deníky
+            </button>
+          )}
         </div>
 
         {notice && (
