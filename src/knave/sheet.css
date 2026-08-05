@@ -1262,11 +1262,33 @@
   box-shadow: 3px 0 10px rgb(23 19 15 / 25%);
 }
 
+/* Every box here states its own alignment and spacing rather than inheriting
+   whatever a bare element rule elsewhere in the bundle happens to set. A
+   stray `main { align-items: flex-start }` once stopped the sheet stretching,
+   and because the sheet is a size container it then had no width to read at
+   all: it collapsed to nothing and answered its own container queries as if
+   the popover were a few pixels wide. */
 .k-app-main {
   display: flex;
   flex-direction: column;
+  align-items: stretch;
   flex: 1 1 auto;
   min-width: 0;
+  gap: 0;
+  padding: 0;
+}
+
+/* The sheet reads its own width to lay itself out, so it must always be given
+   one — never left to work it out from what is inside it. */
+.k-app-sheet,
+.k-sheet {
+  width: 100%;
+}
+
+/* The starter stylesheet used to make every control inherit its type; the
+   sheet says so itself now that the starter is gone. */
+.k-app :where(button, input, textarea, select) {
+  font-family: inherit;
 }
 
 /* The toggle is pinned to the left so it stays put as the column opens. */

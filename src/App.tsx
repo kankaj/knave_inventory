@@ -14,7 +14,6 @@ import { lastBackupExportAt, recordBackupExport } from './knave/backup'
 import { useProfiles } from './knave/storage'
 import { freeRows } from './knave/transfer'
 import './knave/sheet.css'
-import './App.css'
 
 function App() {
   const [ready, setReady] = useState(false)
