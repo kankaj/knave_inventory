@@ -12,6 +12,11 @@ export type HealthPennantProps = {
  * The vertical ŽIV track. Every hit point is one pip; clicking a pip sets the
  * current total, so taking 3 damage is one click instead of arithmetic.
  * Clicking the lowest filled pip empties the track.
+ *
+ * The pips are the quick way in, not the only one: reaching the twentieth of
+ * them from a keyboard used to mean twenty tab stops in the middle of the
+ * sheet. They are off the tab ring now, and the ŽIV field under the track does
+ * the same job in one stop.
  */
 export function HealthPennant({
   current,
@@ -20,6 +25,7 @@ export function HealthPennant({
   onMaxChange,
 }: HealthPennantProps) {
   const maxId = useId()
+  const currentId = useId()
   const safeMax = Math.max(1, max)
   const clamped = Math.min(Math.max(0, current), safeMax)
   const hurt = clamped <= Math.ceil(safeMax / 3)
@@ -41,7 +47,9 @@ export function HealthPennant({
           onChange={onMaxChange}
         />
       </div>
-      <span className="k-label">Živ</span>
+      <label className="k-label" htmlFor={currentId}>
+        Živ
+      </label>
       <div className="k-pennant-track">
         <div className="k-pennant-fills">
           {pips.map((point) => (
@@ -51,6 +59,7 @@ export function HealthPennant({
               className="k-pennant-pip"
               data-filled={point <= clamped}
               data-hurt={hurt}
+              tabIndex={-1}
               aria-label={`Nastavit životy na ${point}`}
               aria-pressed={point <= clamped}
               onClick={() =>
@@ -60,9 +69,17 @@ export function HealthPennant({
           ))}
         </div>
       </div>
-      <span className="k-pennant-readout">
-        {clamped}/{safeMax}
-      </span>
+      <p className="k-pennant-readout">
+        <NumberInput
+          id={currentId}
+          className="k-num-input"
+          value={clamped}
+          min={0}
+          max={safeMax}
+          onChange={onCurrentChange}
+        />
+        <span aria-hidden="true">/{safeMax}</span>
+      </p>
     </div>
   )
 }

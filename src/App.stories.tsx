@@ -18,6 +18,6 @@ type Story = StoryObj<typeof meta>
  */
 export const Disconnected: Story = {
   play: async ({ canvas }) => {
-    await expect(canvas.getByText(/Waiting for Owlbear Rodeo/)).toBeVisible()
+    await expect(canvas.getByText(/Čekám na Owlbear Rodeo/)).toBeVisible()
   },
 }

@@ -88,7 +88,7 @@ export function CharacterSheet({
   // abilities, level, or health track to render.
   if (character.kind === 'stash') {
     return (
-      <div className="k-sheet k-sheet-stash">
+      <div className="k-sheet k-sheet-stash" lang="cs">
         <div className="k-vitals-side">
           <NotesField
             value={character.notes}
@@ -118,7 +118,10 @@ export function CharacterSheet({
   }
 
   return (
-    <div className="k-sheet" data-dead={character.dead}>
+    // The sheet is written in Czech, and the browser has to be told so before
+    // it will hyphenate INTELIGENCE on a syllable rather than breaking it
+    // wherever the six ability names happen to run out of room.
+    <div className="k-sheet" lang="cs" data-dead={character.dead}>
       <div className="k-sheet-main">
         <div className="k-sheet-left">
           <NameMark

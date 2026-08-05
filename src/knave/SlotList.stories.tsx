@@ -240,7 +240,7 @@ export const ResizableRows: Story = {
   render: () => <StashHarness items={['Meč']} />,
   play: async ({ canvas }) => {
     await expect(canvas.getByText('1/1')).toBeVisible()
-    await userEvent.click(canvas.getByRole('button', { name: '+ řádek' }))
+    await userEvent.click(canvas.getByRole('button', { name: 'řádek' }))
     await expect(canvas.getByText('1/2')).toBeVisible()
     await expect(canvas.getByLabelText('Odebrat řádek 2')).toBeEnabled()
     await userEvent.click(canvas.getByLabelText('Odebrat řádek 2'))

@@ -1,3 +1,5 @@
+import { useState } from 'react'
+import { IconClose, IconDownload, IconPlus, IconUpload } from './icons'
 import type { ProfileEntry } from './storage'
 
 export type ProfileSidebarProps = {
@@ -30,7 +32,14 @@ function groupByOwner(entries: readonly ProfileEntry[]): Group[] {
   return groups
 }
 
-/** The column of every sheet in the room, grouped under its owner. */
+/**
+ * The column of every sheet in the room, grouped under its owner.
+ *
+ * The list is navigation, not a tab strip: it used to claim role="tablist"
+ * without a panel to point at, which promises a screen reader arrow-key
+ * movement and a tabpanel that were never there. Plain buttons carrying
+ * aria-current say the true thing.
+ */
 export function ProfileSidebar({
   entries,
   activeId,
@@ -40,6 +49,10 @@ export function ProfileSidebar({
   onExport,
   onImport,
 }: ProfileSidebarProps) {
+  // Reading a file back overwrites sheets that are on the table right now, so
+  // the picked file waits here until somebody says yes.
+  const [pending, setPending] = useState<File | undefined>()
+
   return (
     <div className="k-side">
       <div className="k-side-head">
@@ -50,11 +63,11 @@ export function ProfileSidebar({
           aria-label="Zavřít seznam deníků"
           onClick={onClose}
         >
-          ✕
+          <IconClose />
         </button>
       </div>
 
-      <div className="k-side-list" role="tablist" aria-label="Deníky postav">
+      <nav className="k-side-list" aria-label="Deníky postav">
         {groupByOwner(entries).map((group) => (
           <div className="k-side-group" key={group.owner}>
             <p className="k-side-owner">{group.owner}</p>
@@ -62,10 +75,8 @@ export function ProfileSidebar({
               <button
                 key={entry.profile.id}
                 type="button"
-                role="tab"
                 className="k-side-item"
-                aria-selected={entry.profile.id === activeId}
-                data-active={entry.profile.id === activeId}
+                aria-current={entry.profile.id === activeId}
                 data-offline={!entry.connected}
                 data-dead={entry.profile.character.dead}
                 onClick={() => onSelect(entry.profile.id)}
@@ -77,39 +88,77 @@ export function ProfileSidebar({
                 />
                 <span className="k-side-name">{entry.displayName}</span>
                 {entry.isSelf && <span className="k-side-role">ty</span>}
-                {!entry.connected && (
-                  <span className="k-side-role" title="Hráč není v místnosti">
-                    pryč
-                  </span>
+                {!entry.connected && <span className="k-side-role">pryč</span>}
+                {/* Struck-through type says this on the page; a screen reader
+                    has no strikethrough to read. */}
+                {entry.profile.character.dead && (
+                  <span className="k-sr">mrtvý</span>
                 )}
               </button>
             ))}
           </div>
         ))}
-      </div>
+      </nav>
 
       <button type="button" className="k-side-add" onClick={onAdd}>
-        + nový deník
+        <IconPlus size={0.95} />
+        nový deník
       </button>
 
-      <div className="k-side-backup">
-        <button type="button" className="k-side-file" onClick={onExport}>
-          Stáhnout zálohu
-        </button>
-        <label className="k-side-file">
-          Načíst zálohu
-          <input
-            type="file"
-            accept="application/json,.json"
-            onChange={(event) => {
-              const file = event.target.files?.[0]
-              // Clear the input so picking the same file twice still fires.
-              event.target.value = ''
-              if (file) onImport(file)
-            }}
-          />
-        </label>
-      </div>
+      {pending ? (
+        <div
+          className="k-side-confirm"
+          role="alertdialog"
+          aria-label="Načíst zálohu"
+        >
+          <span>
+            Přepsat deníky v místnosti obsahem souboru{' '}
+            <span className="k-side-confirm-name">{pending.name}</span>?
+          </span>
+          <div className="k-side-confirm-row">
+            <button
+              type="button"
+              className="k-app-action k-app-action-armed"
+              autoFocus
+              onClick={() => {
+                const file = pending
+                setPending(undefined)
+                onImport(file)
+              }}
+            >
+              Přepsat
+            </button>
+            <button
+              type="button"
+              className="k-app-action"
+              onClick={() => setPending(undefined)}
+            >
+              Zrušit
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div className="k-side-backup">
+          <button type="button" className="k-side-file" onClick={onExport}>
+            <IconDownload size={1.1} />
+            Stáhnout zálohu
+          </button>
+          <label className="k-side-file">
+            <IconUpload size={1.1} />
+            Načíst zálohu
+            <input
+              type="file"
+              accept="application/json,.json"
+              onChange={(event) => {
+                const file = event.target.files?.[0]
+                // Clear the input so picking the same file twice still fires.
+                event.target.value = ''
+                if (file) setPending(file)
+              }}
+            />
+          </label>
+        </div>
+      )}
     </div>
   )
 }

@@ -47,6 +47,10 @@ export function NumberInput({
       aria-label={ariaLabel}
       aria-describedby={describedBy}
       value={draft}
+      // A number field under the pointer answers the wheel, so scrolling the
+      // sheet past a focused one silently rewrote it. Dropping focus first
+      // turns the gesture back into plain scrolling.
+      onWheel={(event) => event.currentTarget.blur()}
       onChange={(event) => {
         const raw = event.target.value
         const parsed = Number.parseInt(raw, 10)

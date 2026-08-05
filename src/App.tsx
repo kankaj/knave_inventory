@@ -2,6 +2,14 @@ import { useEffect, useState } from 'react'
 import OBR from '@owlbear-rodeo/sdk'
 import { CharacterSheet } from './knave/CharacterSheet'
 import { ProfileSidebar } from './knave/ProfileSidebar'
+import {
+  IconChest,
+  IconClaim,
+  IconEye,
+  IconEyeOff,
+  IconList,
+  IconTrash,
+} from './knave/icons'
 import { lastBackupExportAt, recordBackupExport } from './knave/backup'
 import { useProfiles } from './knave/storage'
 import { freeRows } from './knave/transfer'
@@ -19,11 +27,9 @@ function App() {
 
   if (!ready) {
     return (
-      <div className="k-app-waiting">
-        <p>
-          Waiting for Owlbear Rodeo. Open this extension from a room to connect.
-        </p>
-      </div>
+      <main className="k-app-waiting">
+        <p>Čekám na Owlbear Rodeo. Otevři rozšíření z místnosti.</p>
+      </main>
     )
   }
 
@@ -35,6 +41,9 @@ const SIDEBAR_KEY = 'knave-inventory/sidebar-open'
 
 /** How stale a portable backup can get before the GM is nudged again. */
 const BACKUP_NUDGE_DAYS = 7
+
+/** The panel the bar's toggle opens, named so the button can point at it. */
+const SIDEBAR_ID = 'k-journal-list'
 
 function recallSidebar(): boolean {
   try {
@@ -66,6 +75,9 @@ function Room() {
   const [selectedId, setSelectedId] = useState('')
   const [sendNotice, setSendNotice] = useState('')
   const [sidebarOpen, setSidebarOpen] = useState(recallSidebar)
+  // Which sheet has had its delete button armed. Keyed by id rather than a
+  // bare flag, so walking to another journal disarms it on the way.
+  const [armedDeleteId, setArmedDeleteId] = useState('')
   // A room survives forever, but deleting it takes its metadata with it, and a
   // fresh room won't match this stamp — only a downloaded file outlives the
   // room itself. Tracked per browser, so the reminder follows whoever GMs.
@@ -84,6 +96,17 @@ function Room() {
     })
   }
 
+  // The column lies over the sheet, and anything laid over the page has to
+  // come off it the way everything else does.
+  useEffect(() => {
+    if (!sidebarOpen) return
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setSidebarOpen(false)
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [sidebarOpen])
+
   const active =
     entries.find((entry) => entry.profile.id === selectedId) ??
     entries.find((entry) => entry.profile.id === selfProfileId) ??
@@ -91,11 +114,13 @@ function Room() {
 
   if (!active) {
     return (
-      <div className="k-app-waiting">
+      <main className="k-app-waiting">
         <p>{loaded ? 'Zakládám tvůj list…' : 'Připojuji se k místnosti…'}</p>
-      </div>
+      </main>
     )
   }
+
+  const armed = armedDeleteId === active.profile.id
 
   // The dead can hand things over but never take any, so they are left out of
   // the recipient list entirely.
@@ -140,8 +165,15 @@ function Room() {
 
   return (
     <div className="k-app" data-side={sidebarOpen}>
+      {/* The page names itself by its layout; a screen reader needs it said. */}
+      <h1 className="k-sr">Knave — deníky postav</h1>
+
       {sidebarOpen && (
-        <aside className="k-app-side" aria-label="Seznam deníků">
+        <aside
+          className="k-app-side"
+          id={SIDEBAR_ID}
+          aria-label="Seznam deníků"
+        >
           <ProfileSidebar
             entries={entries}
             activeId={active.profile.id}
@@ -158,7 +190,7 @@ function Room() {
         </aside>
       )}
 
-      <div className="k-app-main">
+      <main className="k-app-main">
         {/* The bar keeps its height while the column covers it, so opening the
             column never nudges the sheet. */}
         <div className="k-app-bar">
@@ -167,10 +199,11 @@ function Room() {
               type="button"
               className="k-app-action k-side-toggle"
               aria-expanded={false}
+              aria-controls={SIDEBAR_ID}
               onClick={toggleSidebar}
-              title="Otevřít seznam deníků"
             >
-              ☰ deníky
+              <IconList size={1.15} />
+              deníky
             </button>
           )}
 
@@ -182,6 +215,7 @@ function Room() {
                 onClick={openStash}
                 title="Otevřít sklad předmětů — jen pro GM"
               >
+                <IconChest size={1.15} />
                 Předměty
               </button>
               <button
@@ -195,7 +229,12 @@ function Room() {
                     : 'Skrýt tento deník před hráči — zmizí ze seznamu, ale není to zámek na datech.'
                 }
               >
-                {active.profile.hidden ? '🙈 Skryto' : '👁 Viditelné'}
+                {active.profile.hidden ? (
+                  <IconEyeOff size={1.15} />
+                ) : (
+                  <IconEye size={1.15} />
+                )}
+                {active.profile.hidden ? 'Skryto' : 'Viditelné'}
               </button>
             </span>
           )}
@@ -278,6 +317,7 @@ function Room() {
                 className="k-app-action"
                 onClick={() => void claimProfile(active.profile.id)}
               >
+                <IconClaim size={1.15} />
                 Převzít
               </button>
             )}
@@ -294,16 +334,47 @@ function Room() {
               />
               Mrtvý
             </label>
-            <button
-              type="button"
-              className="k-app-action k-app-action-warn"
-              onClick={() => void deleteProfile(active.profile.id)}
-            >
-              Vymazat
-            </button>
+            {/* A deleted journal leaves the room and everyone else's screen at
+                once, and nothing brings it back but a downloaded file. The
+                first press only arms the button. */}
+            {armed ? (
+              <>
+                <span className="k-app-confirm" role="alert">
+                  Vymazat {active.displayName} nadobro?
+                </span>
+                <button
+                  type="button"
+                  className="k-app-action k-app-action-armed"
+                  onClick={() => {
+                    setArmedDeleteId('')
+                    void deleteProfile(active.profile.id)
+                  }}
+                >
+                  <IconTrash size={1.15} />
+                  Ano, vymazat
+                </button>
+                <button
+                  type="button"
+                  className="k-app-action"
+                  autoFocus
+                  onClick={() => setArmedDeleteId('')}
+                >
+                  Zrušit
+                </button>
+              </>
+            ) : (
+              <button
+                type="button"
+                className="k-app-action k-app-action-warn"
+                onClick={() => setArmedDeleteId(active.profile.id)}
+              >
+                <IconTrash size={1.15} />
+                Vymazat
+              </button>
+            )}
           </span>
         </div>
-      </div>
+      </main>
     </div>
   )
 }

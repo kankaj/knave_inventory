@@ -3,16 +3,34 @@
 @import '@fontsource/eb-garamond/400-italic.css';
 @import '@fontsource/unifrakturmaguntia/400.css';
 
-.k-sheet {
+/* One set of inks for the whole extension. The shell and the sheet used to
+   carry the same colours twice — once as tokens, once as raw hex — so a change
+   to the paper only landed on half the screen. :where() keeps the specificity
+   at zero, and naming the sheet separately keeps it self-contained when
+   Storybook mounts it without the shell around it. */
+:where(.k-app, .k-sheet, .k-app-waiting) {
   --ink: #17130f;
   --ink-soft: #5d5449;
+  /* The faintest ink still allowed on the page: 4.7:1 on --paper, 5.3:1 on
+     --paper-hi. Placeholders used to be --ink-soft at 45-55% opacity, which
+     came out near 2:1 and vanished in a lit room. */
+  --ink-faint: #6e6456;
   --paper: #efe7d4;
   --paper-hi: #f8f3e6;
+  /* The journal column, one shade down from the sheet so the two read apart. */
+  --paper-side: #e7dcc4;
   --wax: #8a2b1c;
 
   --rule-hair: 1.5px;
   --rule-heavy: 3px;
-  --radius: 10px;
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 10px;
+  --radius: var(--radius-lg);
+
+  /* WCAG 2.2 target minimum. A mark may be drawn smaller than this, but the
+     thing that answers a click never is. */
+  --tap: 24px;
 
   /* Print dots for the writing lines, crisper than a dotted border. */
   --dots: repeating-linear-gradient(
@@ -21,6 +39,13 @@
     transparent 1.5px 5px
   );
 
+  /* The sheet is parchment in every room. Without this the browser hands a
+     dark-mode player dark-themed number spinners, checkboxes and scrollbars on
+     a light page — controls that read as blank until you click them. */
+  color-scheme: light;
+}
+
+.k-sheet {
   box-sizing: border-box;
   container-type: inline-size;
   padding: 12px 14px 14px;
@@ -28,6 +53,26 @@
   color: var(--ink);
   font: 400 15px/1.35 'EB Garamond', Georgia, serif;
   text-rendering: optimizeLegibility;
+}
+
+/* Drawn glyphs sit on the type baseline like a letter would. */
+.k-icon {
+  flex: 0 0 auto;
+  vertical-align: -0.14em;
+}
+
+/* Text that only a screen reader reads: headings the printed page states by
+   its layout, and units the eye takes from a column header. */
+.k-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  border: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
 }
 
 /* The whole extension, shell included: a padded box that is told to be exactly
@@ -43,9 +88,13 @@
   box-sizing: border-box;
 }
 
+/* The ring used to be drawn only inside the sheet, so every control in the
+   shell and the journal column fell back to whatever the browser felt like. */
+.k-app :focus-visible,
 .k-sheet :focus-visible {
   outline: 2px solid var(--wax);
   outline-offset: 2px;
+  border-radius: var(--radius-sm);
 }
 
 /* ── Sheet composition: across, not down ──────────────────── */
@@ -88,8 +137,8 @@
 }
 
 .k-namemark::placeholder {
-  color: var(--ink-soft);
-  opacity: 0.45;
+  color: var(--ink-faint);
+  opacity: 1;
 }
 
 .k-namemark[data-struck='true'] {
@@ -100,9 +149,11 @@
 
 /* ── Labels and written-on lines ──────────────────────────── */
 
+/* Letterspaced small caps read a size below running text, but 10px was under
+   the floor for a printed label; 11px is the smallest that stays legible. */
 .k-label {
   display: block;
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 600;
   letter-spacing: 0.14em;
   text-transform: uppercase;
@@ -121,8 +172,8 @@
 }
 
 .k-input::placeholder {
-  color: var(--ink-soft);
-  opacity: 0.55;
+  color: var(--ink-faint);
+  opacity: 1;
   font-style: italic;
 }
 
@@ -283,13 +334,19 @@
   align-items: flex-end;
   justify-content: center;
   min-height: calc(2 * 1.15em);
-  font-size: 8.5px;
+  font-size: 11px;
   font-weight: 600;
   line-height: 1.15;
   letter-spacing: 0.01em;
   text-align: center;
   text-transform: uppercase;
-  overflow-wrap: anywhere;
+  /* `anywhere` also shrinks the column's min-content contribution to a single
+     letter, so the grid handed every name its narrowest box and INTELIGENCE
+     wrapped after INTELIGEN even with room to spare. `break-word` still breaks
+     a word that genuinely does not fit, but leaves the column sized to the
+     whole name; hyphens put the break on a syllable when it comes to that. */
+  overflow-wrap: break-word;
+  hyphens: auto;
   cursor: pointer;
 }
 
@@ -433,9 +490,10 @@
 /* ── Health pennant (MAX ŽIV / ŽIV) ───────────────────────── */
 
 .k-pennant {
-  /* One hit point is always this tall — the size it had on a six-point sheet.
-     A tougher character gets a longer track, not tighter cells. */
-  --pip-height: 21px;
+  /* One hit point is always this tall — the size it had on a six-point sheet,
+     rounded up to the target minimum. A tougher character gets a longer track,
+     not tighter cells. */
+  --pip-height: 24px;
 
   display: flex;
   flex-direction: column;
@@ -512,10 +570,28 @@
   background: color-mix(in srgb, var(--ink) 35%, transparent);
 }
 
+/* Pips are the quick way to take three damage in one click, but reaching the
+   twentieth one from the keyboard meant twenty tab stops. They are off the tab
+   ring; the readout below is a real field and does the same job in one stop. */
 .k-pennant-readout {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 0;
+  margin: 0;
   font-size: 13px;
   font-variant-numeric: tabular-nums;
   color: var(--ink-soft);
+}
+
+.k-pennant-readout .k-num-input {
+  width: 2.6ch;
+  padding: 1px 0 2px;
+  border-bottom: var(--rule-hair) solid var(--ink-faint);
+  border-radius: 0;
+  font: 600 14px/1 'EB Garamond', serif;
+  text-align: right;
+  color: var(--ink);
 }
 
 /* ── Free-form notes ──────────────────────────────────────── */
@@ -541,11 +617,12 @@
   color: var(--ink);
   font: inherit;
   resize: none;
+  overscroll-behavior: contain;
 }
 
 .k-notes-area::placeholder {
-  color: var(--ink-soft);
-  opacity: 0.55;
+  color: var(--ink-faint);
+  opacity: 1;
   font-style: italic;
 }
 
@@ -613,15 +690,19 @@
 }
 
 /* Twenty rows of the word "Poznámka" would drown out the gear, so the prompt
-   only shows on the row being worked on. */
+   only shows on the row being worked on. The first row keeps it for good: with
+   the prompt hidden everywhere, nobody using a keyboard or a touchscreen ever
+   learned the second column was writable. */
 .k-slot-note::placeholder {
+  color: var(--ink-faint);
   opacity: 0;
   transition: opacity 110ms ease-out;
 }
 
+.k-slots-grid > .k-slot:first-child .k-slot-note::placeholder,
 .k-slot:hover .k-slot-note::placeholder,
-.k-slot-note:focus::placeholder {
-  opacity: 0.5;
+.k-slot:focus-within .k-slot-note::placeholder {
+  opacity: 1;
 }
 
 .k-slot[data-beyond='true'] {
@@ -638,16 +719,31 @@
   grid-template-columns: auto 18px minmax(0, 1.1fr) minmax(0, 1fr) auto;
 }
 
+/* The box stays the size it was drawn; the label around it is what a finger
+   actually has to hit. */
+.k-slot-pick-hit {
+  display: grid;
+  place-items: center;
+  width: var(--tap);
+  height: var(--tap);
+  margin: 0;
+  cursor: pointer;
+}
+
 .k-slot-pick {
-  width: 13px;
-  height: 13px;
+  width: 14px;
+  height: 14px;
   margin: 0;
   accent-color: var(--ink);
   cursor: pointer;
 }
 
 .k-slot-pick:disabled {
-  opacity: 0.3;
+  opacity: 0.35;
+  cursor: default;
+}
+
+.k-slot-pick-hit:has(.k-slot-pick:disabled) {
   cursor: default;
 }
 
@@ -666,45 +762,40 @@
   background-color: color-mix(in srgb, var(--wax) 8%, transparent);
 }
 
-/* Cross drawn in CSS: emoji glyphs would break the printed look. */
+/* Cross drawn in CSS: emoji glyphs would break the printed look. The mark
+   stays 15px as printed while the button around it answers at full size — the
+   old 15px button was under half the area a fingertip needs. */
 .k-slot-wound {
-  position: relative;
-  width: 15px;
-  height: 15px;
+  display: grid;
+  place-items: center;
+  width: var(--tap);
+  height: var(--tap);
   flex: 0 0 auto;
   padding: 0;
-  border: 1.5px solid color-mix(in srgb, var(--ink) 35%, transparent);
-  border-radius: 3px;
+  border: 0;
   background: transparent;
+  color: color-mix(in srgb, var(--ink) 45%, var(--paper-hi));
   cursor: pointer;
+  transition: color 120ms ease-out;
 }
 
-.k-slot-wound::before,
-.k-slot-wound::after {
+.k-slot-wound::before {
   content: '';
-  position: absolute;
-  inset: 50% 2px auto 2px;
-  height: 1.5px;
-  background: color-mix(in srgb, var(--ink) 45%, transparent);
-  translate: 0 -50%;
+  width: 15px;
+  height: 15px;
+  border: 1.5px solid currentColor;
+  border-radius: var(--radius-sm);
+  background:
+    linear-gradient(currentColor 0 0) center / 7px 1.5px no-repeat,
+    linear-gradient(currentColor 0 0) center / 1.5px 7px no-repeat;
 }
 
-.k-slot-wound::after {
-  rotate: 90deg;
-}
-
-.k-slot-wound:hover::before,
-.k-slot-wound:hover::after {
-  background: var(--ink);
+.k-slot-wound:hover {
+  color: var(--ink);
 }
 
 .k-slot-wound[aria-pressed='true'] {
-  border-color: var(--wax);
-}
-
-.k-slot-wound[aria-pressed='true']::before,
-.k-slot-wound[aria-pressed='true']::after {
-  background: var(--wax);
+  color: var(--wax);
 }
 
 /* ── Resizable rows (stash only) ───────────────────────────── */
@@ -718,32 +809,40 @@
 }
 
 .k-slot-remove {
-  width: 16px;
-  height: 16px;
+  display: grid;
+  place-items: center;
+  width: var(--tap);
+  height: var(--tap);
   flex: 0 0 auto;
   padding: 0;
-  border: 1.5px solid var(--ink-soft);
-  border-radius: 3px;
+  border: 0;
+  border-radius: var(--radius-sm);
   background: transparent;
   color: var(--ink-soft);
-  font: 600 12px/1 'EB Garamond', serif;
-  line-height: 1;
+  font-size: 14px;
   cursor: pointer;
+  transition:
+    color 120ms ease-out,
+    background-color 120ms ease-out;
 }
 
 .k-slot-remove:hover:not(:disabled) {
-  border-color: var(--wax);
   background: color-mix(in srgb, var(--wax) 12%, transparent);
   color: var(--wax);
 }
 
 .k-slot-remove:disabled {
-  opacity: 0.25;
+  opacity: 0.35;
   cursor: default;
 }
 
 .k-slots-add {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
   width: 100%;
+  min-height: var(--tap);
   padding: 5px 0;
   border: 0;
   border-top: var(--rule-hair) solid var(--ink);
@@ -753,6 +852,9 @@
   letter-spacing: 0.06em;
   text-transform: uppercase;
   cursor: pointer;
+  transition:
+    color 120ms ease-out,
+    background-color 120ms ease-out;
 }
 
 .k-slots-add:hover {
@@ -800,13 +902,21 @@
   display: flex;
   align-items: baseline;
   gap: 6px;
+  min-height: var(--tap);
   padding: 3px 8px;
   border: var(--rule-hair) solid var(--ink);
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   background: transparent;
   color: var(--ink);
   font: 400 13px/1.2 'EB Garamond', serif;
   cursor: pointer;
+  transition:
+    color 120ms ease-out,
+    background-color 120ms ease-out;
+}
+
+.k-send-target:hover:not([data-active='true']) {
+  background: color-mix(in srgb, var(--ink) 8%, transparent);
 }
 
 .k-send-target[data-active='true'] {
@@ -814,10 +924,18 @@
   color: var(--paper-hi);
 }
 
+/* How many rows the recipient has left. It rides in the button rather than a
+   title attribute, which a touchscreen never shows. */
 .k-send-target-free {
   font-size: 11px;
   font-variant-numeric: tabular-nums;
-  opacity: 0.7;
+}
+
+.k-send-legend {
+  margin: 5px 0 0;
+  font-size: 11px;
+  font-style: italic;
+  color: var(--ink-soft);
 }
 
 .k-send-foot {
@@ -845,15 +963,25 @@
   display: flex;
   align-items: center;
   gap: 5px;
+  min-height: var(--tap);
+  padding: 0 4px;
+  border-radius: var(--radius-sm);
   font: 600 11px/1 'EB Garamond', serif;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: #5d5449;
+  color: var(--ink-soft);
   cursor: pointer;
 }
 
+.k-dead-switch:hover {
+  background: color-mix(in srgb, var(--ink) 7%, transparent);
+}
+
 .k-dead-switch input {
-  accent-color: #8a2b1c;
+  width: 15px;
+  height: 15px;
+  margin: 0;
+  accent-color: var(--wax);
   cursor: pointer;
 }
 
@@ -870,8 +998,8 @@
   height: 100%;
   padding: 10px 10px 12px;
   overflow: hidden;
-  background: #e7dcc4;
-  color: #17130f;
+  background: var(--paper-side);
+  color: var(--ink);
 }
 
 /* The heading sits level with the button the column replaced, with the way back
@@ -881,25 +1009,29 @@
   align-items: center;
   justify-content: space-between;
   gap: 6px;
-  min-height: 20px;
+  min-height: var(--tap);
 }
 
 .k-side-close {
   display: grid;
   place-items: center;
-  width: 20px;
-  height: 20px;
+  width: var(--tap);
+  height: var(--tap);
   padding: 0;
-  border: 1px solid #5d5449;
-  border-radius: 5px;
+  border: 1px solid var(--ink-soft);
+  border-radius: var(--radius-md);
   background: transparent;
-  color: #5d5449;
-  font: 600 11px/1 'EB Garamond', serif;
+  color: var(--ink-soft);
+  font-size: 12px;
   cursor: pointer;
+  transition:
+    color 120ms ease-out,
+    background-color 120ms ease-out;
 }
 
 .k-side-close:hover {
-  background: color-mix(in srgb, #17130f 10%, transparent);
+  background: color-mix(in srgb, var(--ink) 10%, transparent);
+  color: var(--ink);
 }
 
 .k-side-title {
@@ -907,7 +1039,7 @@
   font: 600 11px/1 'EB Garamond', serif;
   letter-spacing: 0.16em;
   text-transform: uppercase;
-  color: #5d5449;
+  color: var(--ink-soft);
 }
 
 /* min-height 0 lets the list give way in a short popover, so the add and backup
@@ -919,6 +1051,9 @@
   flex: 1 1 auto;
   min-height: 0;
   overflow-y: auto;
+  /* Reaching the end of the list must not start scrolling the Owlbear window
+     behind the popover. */
+  overscroll-behavior: contain;
   scrollbar-width: thin;
 }
 
@@ -931,11 +1066,11 @@
 .k-side-owner {
   margin: 0 0 2px;
   padding-bottom: 2px;
-  border-bottom: 1px solid color-mix(in srgb, #17130f 25%, transparent);
-  font: italic 400 10.5px/1.2 'EB Garamond', Georgia, serif;
+  border-bottom: 1px solid color-mix(in srgb, var(--ink) 25%, transparent);
+  font: italic 400 11px/1.2 'EB Garamond', Georgia, serif;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: #5d5449;
+  color: var(--ink-soft);
 }
 
 .k-side-item {
@@ -943,11 +1078,12 @@
   align-items: center;
   gap: 6px;
   width: 100%;
+  min-height: var(--tap);
   padding: 4px 7px;
   border: 1px solid transparent;
-  border-radius: 5px;
+  border-radius: var(--radius-md);
   background: transparent;
-  color: #17130f;
+  color: var(--ink);
   font: 400 13px/1.2 'EB Garamond', serif;
   text-align: left;
   cursor: pointer;
@@ -955,24 +1091,27 @@
 }
 
 .k-side-item:hover {
-  background: color-mix(in srgb, #17130f 8%, transparent);
+  background: color-mix(in srgb, var(--ink) 8%, transparent);
 }
 
-.k-side-item[data-active='true'] {
-  background: #17130f;
-  color: #efe7d4;
+.k-side-item[aria-current='true'] {
+  background: var(--ink);
+  color: var(--paper);
   font-weight: 600;
 }
 
 .k-side-item[data-offline='true'] .k-side-name {
   font-style: italic;
-  opacity: 0.65;
 }
 
+/* A player's own colour, ringed so a pale one still reads against parchment.
+   It is never the only thing saying who a row is — the name is right beside
+   it — so colour alone never has to carry the meaning. */
 .k-side-dot {
   width: 8px;
   height: 8px;
   border-radius: 50%;
+  border: 1px solid color-mix(in srgb, var(--ink) 45%, transparent);
   flex: 0 0 auto;
 }
 
@@ -985,27 +1124,36 @@
 
 .k-side-role {
   flex: 0 0 auto;
-  font-size: 9px;
+  font-size: 11px;
   font-weight: 600;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  opacity: 0.7;
+  font-style: italic;
+  letter-spacing: 0.06em;
+  color: inherit;
 }
 
 .k-side-add {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  min-height: var(--tap);
   padding: 4px 8px;
-  border: 1px dashed #17130f;
-  border-radius: 6px;
+  border: 1px dashed var(--ink);
+  border-radius: var(--radius-md);
   background: transparent;
-  color: #5d5449;
+  color: var(--ink-soft);
   font: 600 11px/1 'EB Garamond', serif;
   letter-spacing: 0.06em;
   text-transform: uppercase;
   cursor: pointer;
+  transition:
+    color 120ms ease-out,
+    background-color 120ms ease-out;
 }
 
 .k-side-add:hover {
-  background: color-mix(in srgb, #17130f 8%, transparent);
+  background: color-mix(in srgb, var(--ink) 8%, transparent);
+  color: var(--ink);
 }
 
 .k-side-backup {
@@ -1013,23 +1161,68 @@
   flex-wrap: wrap;
   gap: 6px;
   padding-top: 8px;
-  border-top: 1px solid color-mix(in srgb, #17130f 25%, transparent);
+  border-top: 1px solid color-mix(in srgb, var(--ink) 25%, transparent);
 }
 
 .k-side-file {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  /* The column is narrow, so a two-word label takes a line of its own rather
+     than being cut down to a word that no longer says what it does. */
+  flex: 1 0 100%;
+  min-height: var(--tap);
   padding: 3px 7px;
-  border: 1px solid #5d5449;
-  border-radius: 5px;
+  border: 1px solid var(--ink-soft);
+  border-radius: var(--radius-md);
   background: transparent;
-  color: #5d5449;
-  font: 600 10px/1.2 'EB Garamond', serif;
-  letter-spacing: 0.06em;
+  color: var(--ink-soft);
+  font: 600 11px/1.2 'EB Garamond', serif;
+  /* Tight enough that STÁHNOUT ZÁLOHU keeps to one line in a 176px column,
+     so the two backup buttons stay the same height as each other. */
+  letter-spacing: 0.04em;
   text-transform: uppercase;
   cursor: pointer;
+  transition:
+    color 120ms ease-out,
+    background-color 120ms ease-out;
 }
 
 .k-side-file:hover {
-  background: color-mix(in srgb, #17130f 8%, transparent);
+  background: color-mix(in srgb, var(--ink) 8%, transparent);
+  color: var(--ink);
+}
+
+/* The label is the button, so it has to show the ring its input would get. */
+.k-side-file:focus-within {
+  outline: 2px solid var(--wax);
+  outline-offset: 2px;
+}
+
+/* Reading a file back replaces what is in the room, so it asks first. */
+.k-side-confirm {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+  padding: 7px 8px;
+  border: var(--rule-hair) solid var(--wax);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--wax) 8%, transparent);
+  font: 400 12px/1.35 'EB Garamond', Georgia, serif;
+  color: var(--ink);
+}
+
+.k-side-confirm-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.k-side-confirm-name {
+  overflow-wrap: anywhere;
+  font-style: italic;
 }
 
 /* The file picker itself stays hidden; its label is the button. */
@@ -1050,7 +1243,8 @@
   display: flex;
   align-items: stretch;
   min-height: 100svh;
-  background: #efe7d4;
+  background: var(--paper);
+  color: var(--ink);
 }
 
 /* The column lies over the sheet rather than pushing it sideways, so opening it
@@ -1064,7 +1258,7 @@
   z-index: 4;
   width: 176px;
   height: 100svh;
-  border-right: 2px solid #17130f;
+  border-right: 2px solid var(--ink);
   box-shadow: 3px 0 10px rgb(23 19 15 / 25%);
 }
 
@@ -1085,7 +1279,7 @@
 }
 
 .k-side-toggle {
-  font-size: 10px;
+  font-size: 11px;
 }
 
 /* GM-only controls stay clear of the sidebar toggle on the left. */
@@ -1103,11 +1297,11 @@
   gap: 8px;
   margin: 6px 8px 0;
   padding: 6px 8px;
-  border: 1.5px solid #8a2b1c;
-  border-radius: 6px;
-  background: color-mix(in srgb, #8a2b1c 8%, transparent);
-  color: #17130f;
-  font: 400 11.5px/1.35 'EB Garamond', Georgia, serif;
+  border: var(--rule-hair) solid var(--wax);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--wax) 8%, transparent);
+  color: var(--ink);
+  font: 400 12px/1.35 'EB Garamond', Georgia, serif;
 }
 
 .k-app-sheet {
@@ -1119,10 +1313,11 @@
   align-items: center;
   justify-content: space-between;
   gap: 8px;
+  flex-wrap: wrap;
   padding: 6px 14px 10px;
-  background: #efe7d4;
-  color: #5d5449;
-  font: italic 400 11.5px/1.3 'EB Garamond', Georgia, serif;
+  background: var(--paper);
+  color: var(--ink-soft);
+  font: italic 400 12px/1.3 'EB Garamond', Georgia, serif;
 }
 
 .k-app-note {
@@ -1137,28 +1332,63 @@
 }
 
 .k-app-action {
-  padding: 3px 8px;
-  border: 1.5px solid #17130f;
-  border-radius: 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  min-height: var(--tap);
+  padding: 3px 9px;
+  border: var(--rule-hair) solid var(--ink);
+  border-radius: var(--radius-md);
   background: transparent;
-  color: #17130f;
+  color: var(--ink);
   font: 600 11px/1 'EB Garamond', serif;
   letter-spacing: 0.06em;
   text-transform: uppercase;
   cursor: pointer;
+  transition:
+    color 120ms ease-out,
+    background-color 120ms ease-out,
+    border-color 120ms ease-out;
 }
 
-.k-app-action:hover {
-  background: color-mix(in srgb, #17130f 10%, transparent);
+.k-app-action:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--ink) 10%, transparent);
+}
+
+/* An icon-only button is square, so the glyph is not stranded off-centre. */
+.k-app-action-icon {
+  width: var(--tap);
+  padding: 0;
 }
 
 .k-app-action-warn {
-  border-color: #8a2b1c;
-  color: #8a2b1c;
+  border-color: var(--wax);
+  color: var(--wax);
 }
 
-.k-app-action-warn:hover {
-  background: color-mix(in srgb, #8a2b1c 12%, transparent);
+.k-app-action-warn:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--wax) 12%, transparent);
+}
+
+/* Deleting a journal cannot be undone, so the button asks once before it does
+   it. The second press is the loud one. */
+.k-app-action-armed {
+  border-color: var(--wax);
+  background: var(--wax);
+  color: var(--paper-hi);
+}
+
+.k-app-action-armed:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--wax) 88%, #000);
+}
+
+/* The question the armed delete button is asking, so the two loud buttons are
+   never on their own with nothing said. */
+.k-app-confirm {
+  font-style: normal;
+  font-weight: 600;
+  color: var(--wax);
 }
 
 .k-app-waiting {
@@ -1167,8 +1397,8 @@
   gap: 6px;
   min-height: 100svh;
   padding: 24px;
-  background: #efe7d4;
-  color: #5d5449;
+  background: var(--paper);
+  color: var(--ink-soft);
   text-align: center;
   font: italic 400 14px/1.4 'EB Garamond', Georgia, serif;
 }
@@ -1254,7 +1484,10 @@
   .k-pennant-pip {
     flex: 1 1 0;
     height: 42px;
-    min-width: 5px;
+    /* Laid sideways the cells share one row, so a twenty-point track cannot
+       give each one a full target. Ten pixels is the floor before a pip stops
+       being clickable at all; the ŽIV field below is the exact way in. */
+    min-width: 10px;
     border-top: 0;
     border-left: 1px solid color-mix(in srgb, var(--ink) 25%, transparent);
   }
@@ -1316,8 +1549,12 @@
   }
 }
 
+/* The shell has its own hovers and fades, and used to keep animating them for
+   somebody who asked the system for stillness. */
 @media (prefers-reduced-motion: reduce) {
+  .k-app *,
   .k-sheet * {
-    transition: none !important;
+    transition-duration: 1ms !important;
+    animation-duration: 1ms !important;
   }
 }

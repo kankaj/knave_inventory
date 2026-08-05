@@ -1,3 +1,4 @@
+import { IconMinus, IconPlus } from './icons'
 import { slotTaken, type Slot } from './types'
 
 export type SlotListProps = {
@@ -39,7 +40,9 @@ export function SlotList({
     <section className="k-slots" aria-label="Předměty">
       <header className="k-slots-head">
         <span className="k-label">Předměty</span>
-        <span className="k-slots-count" data-over={over}>
+        {/* Being overloaded is said in words as well as in red ink, so the
+            colour is never the only thing carrying it. */}
+        <span className="k-slots-count" data-over={over} role="status">
           {over ? `Přetížen ${used}/${capacity}` : `${used}/${capacity}`}
         </span>
       </header>
@@ -57,14 +60,18 @@ export function SlotList({
               data-resizing={resizing}
             >
               {picking && (
-                <input
-                  type="checkbox"
-                  className="k-slot-pick"
-                  checked={selected.includes(index)}
-                  disabled={!sendable}
-                  aria-label={`Poslat řádek ${index + 1}`}
-                  onChange={() => onSelectToggle(index)}
-                />
+                // The drawn box keeps its printed size; the label around it is
+                // what a fingertip actually has to hit.
+                <label className="k-slot-pick-hit">
+                  <input
+                    type="checkbox"
+                    className="k-slot-pick"
+                    checked={selected.includes(index)}
+                    disabled={!sendable}
+                    aria-label={`Poslat řádek ${index + 1}`}
+                    onChange={() => onSelectToggle(index)}
+                  />
+                </label>
               )}
               <span className="k-slot-index" aria-hidden="true">
                 {index + 1}
@@ -103,7 +110,7 @@ export function SlotList({
                   aria-label={`Odebrat řádek ${index + 1}`}
                   onClick={() => onRemoveRow(index)}
                 >
-                  −
+                  <IconMinus />
                 </button>
               )}
             </div>
@@ -111,12 +118,9 @@ export function SlotList({
         })}
       </div>
       {onAddRow && (
-        <button
-          type="button"
-          className="k-slots-add"
-          onClick={onAddRow}
-        >
-          + řádek
+        <button type="button" className="k-slots-add" onClick={onAddRow}>
+          <IconPlus size={0.95} />
+          řádek
         </button>
       )}
     </section>

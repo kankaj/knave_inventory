@@ -80,16 +80,16 @@ function Harness() {
 export const Room: Story = {
   render: () => <Harness />,
   play: async ({ canvas }) => {
-    await expect(canvas.getByRole('tab', { name: /Jarmila/ })).toHaveAttribute(
-      'aria-selected',
-      'true',
-    )
+    await expect(
+      canvas.getByRole('button', { name: /Jarmila/ }),
+    ).toHaveAttribute('aria-current', 'true')
     // A sheet whose owner left the room stays available.
-    await expect(canvas.getByRole('tab', { name: /Květa/ })).toBeVisible()
+    await expect(canvas.getByRole('button', { name: /Květa/ })).toBeVisible()
     // Owner groups, and inside a group the oldest sheet first.
     const names = canvas
-      .getAllByRole('tab')
-      .map((tab) => tab.textContent?.replace(/ty|pryč/g, '').trim())
+      .getAllByRole('button')
+      .filter((button) => button.classList.contains('k-side-item'))
+      .map((item) => item.textContent?.replace(/ty|pryč|mrtvý/g, '').trim())
     await expect(names).toEqual([
       'Bohuš',
       'Jarmila',
@@ -104,13 +104,12 @@ export const Room: Story = {
 export const SwitchToAnotherPlayer: Story = {
   render: () => <Harness />,
   play: async ({ canvas }) => {
-    const other = canvas.getByRole('tab', { name: /Bohuš/ })
+    const other = canvas.getByRole('button', { name: /Bohuš/ })
     await userEvent.click(other)
-    await expect(other).toHaveAttribute('aria-selected', 'true')
-    await expect(canvas.getByRole('tab', { name: /Jarmila/ })).toHaveAttribute(
-      'aria-selected',
-      'false',
-    )
+    await expect(other).toHaveAttribute('aria-current', 'true')
+    await expect(
+      canvas.getByRole('button', { name: /Jarmila/ }),
+    ).toHaveAttribute('aria-current', 'false')
   },
 }
 

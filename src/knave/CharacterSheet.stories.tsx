@@ -115,7 +115,7 @@ export const InPopover: Story = {
       'Jarmila Hrdlořezná',
     )
     await expect(canvas.getByLabelText('Brnění')).toHaveValue(2)
-    await expect(canvas.getByText('5/9')).toBeVisible()
+    await expect(canvas.getByLabelText('Živ')).toHaveValue(5)
     // Odolnost 2 → 12 usable rows.
     await expect(canvas.getByText('8/12')).toBeVisible()
   },
@@ -199,7 +199,7 @@ export const GmStash: Story = {
     await expect(canvas.queryByLabelText('Brnění')).toBeNull()
     await expect(canvas.queryByText('Živ')).toBeNull()
     await expect(canvas.getByText('2/6')).toBeVisible()
-    await userEvent.click(canvas.getByRole('button', { name: '+ řádek' }))
+    await userEvent.click(canvas.getByRole('button', { name: 'řádek' }))
     await expect(canvas.getByText('2/7')).toBeVisible()
   },
 }

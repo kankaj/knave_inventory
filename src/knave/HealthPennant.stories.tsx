@@ -43,7 +43,7 @@ function Harness({ start, max }: { start: number; max: number }) {
 export const Full: Story = {
   render: () => <Harness start={8} max={8} />,
   play: async ({ canvas }) => {
-    await expect(canvas.getByText('8/8')).toBeVisible()
+    await expect(canvas.getByLabelText('Živ')).toHaveValue(8)
   },
 }
 
@@ -52,7 +52,7 @@ export const TakeDamage: Story = {
   render: () => <Harness start={8} max={8} />,
   play: async ({ canvas }) => {
     await userEvent.click(canvas.getByLabelText('Nastavit životy na 5'))
-    await expect(canvas.getByText('5/8')).toBeVisible()
+    await expect(canvas.getByLabelText('Živ')).toHaveValue(5)
   },
 }
 
@@ -61,7 +61,7 @@ export const DownToNothing: Story = {
   render: () => <Harness start={1} max={8} />,
   play: async ({ canvas }) => {
     await userEvent.click(canvas.getByLabelText('Nastavit životy na 1'))
-    await expect(canvas.getByText('0/8')).toBeVisible()
+    await expect(canvas.getByLabelText('Živ')).toHaveValue(0)
   },
 }
 
