@@ -64,6 +64,13 @@ const jarmila: Partial<Character> = {
   ]),
 }
 
+const stash: Partial<Character> = {
+  kind: 'stash',
+  name: 'Předměty',
+  notes: 'Kořist z jeskyně, rozdělit po výpravě.',
+  slots: rows(['Zlatý pohár', 'Svitek']).slice(0, 6),
+}
+
 function Harness({
   seed,
   width,
@@ -181,6 +188,19 @@ export const SendingItems: Story = {
     await userEvent.click(canvas.getByRole('radio', { name: /Bohuš/ }))
     await userEvent.click(canvas.getByRole('button', { name: 'Poslat' }))
     await expect(canvas.getByText(/Posláno bohus: 2/)).toBeVisible()
+  },
+}
+
+/** A GM's loot container: notes, item rows, and sending — nothing else. */
+export const GmStash: Story = {
+  render: () => <Harness seed={stash} width={520} withSend />,
+  play: async ({ canvas }) => {
+    await expect(canvas.queryByLabelText('Jméno')).toBeNull()
+    await expect(canvas.queryByLabelText('Brnění')).toBeNull()
+    await expect(canvas.queryByText('Živ')).toBeNull()
+    await expect(canvas.getByText('2/6')).toBeVisible()
+    await userEvent.click(canvas.getByRole('button', { name: '+ řádek' }))
+    await expect(canvas.getByText('2/7')).toBeVisible()
   },
 }
 

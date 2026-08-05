@@ -10,6 +10,9 @@ export type SlotListProps = {
   /** Rows picked for sending. Omit to hide the send checkboxes entirely. */
   selected?: readonly number[]
   onSelectToggle?: (index: number) => void
+  /** A grown/shrunk row count (stash only). Omit for the fixed character grid. */
+  onAddRow?: () => void
+  onRemoveRow?: (index: number) => void
 }
 
 /**
@@ -24,10 +27,13 @@ export function SlotList({
   onWoundToggle,
   selected,
   onSelectToggle,
+  onAddRow,
+  onRemoveRow,
 }: SlotListProps) {
   const used = slots.filter(slotTaken).length
   const over = used > capacity
   const picking = selected !== undefined && onSelectToggle !== undefined
+  const resizing = onAddRow !== undefined && onRemoveRow !== undefined
 
   return (
     <section className="k-slots" aria-label="Předměty">
@@ -48,6 +54,7 @@ export function SlotList({
               data-beyond={beyond}
               data-wound={slot.wound}
               data-picking={picking}
+              data-resizing={resizing}
             >
               {picking && (
                 <input
@@ -87,10 +94,31 @@ export function SlotList({
                 }
                 onClick={() => onWoundToggle(index)}
               />
+              {resizing && (
+                <button
+                  type="button"
+                  className="k-slot-remove"
+                  disabled={slots.length <= 1 || slotTaken(slot)}
+                  title="Odebrat řádek"
+                  aria-label={`Odebrat řádek ${index + 1}`}
+                  onClick={() => onRemoveRow(index)}
+                >
+                  −
+                </button>
+              )}
             </div>
           )
         })}
       </div>
+      {onAddRow && (
+        <button
+          type="button"
+          className="k-slots-add"
+          onClick={onAddRow}
+        >
+          + řádek
+        </button>
+      )}
     </section>
   )
 }

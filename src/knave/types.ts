@@ -84,7 +84,14 @@ export function slotTaken(slot: Slot): boolean {
   return slot.wound || slot.text.trim() !== ''
 }
 
+/**
+ * A character sheet uses the fixed printed grid; a stash is a GM-only item
+ * container whose row count is set by hand instead.
+ */
+export type CharacterKind = 'character' | 'stash'
+
 export type Character = {
+  kind: CharacterKind
   name: string
   /** ÚROVEŇ */
   level: number
@@ -97,14 +104,23 @@ export type Character = {
   /** Free-form scratch space next to the vitals. */
   notes: string
   abilities: Record<AbilityKey, number>
-  /** Always SLOT_COUNT entries, items and wounds alike. */
+  /** Exactly SLOT_COUNT entries for a character; whatever length the GM set
+   *  for a stash. */
   slots: Slot[]
   /** Struck through on the sheet and in the column. Cannot receive items. */
   dead: boolean
 }
 
+/** A freshly created stash starts small; the GM grows it as loot arrives. */
+export const STASH_DEFAULT_ROWS = 6
+
+export function emptyStashSlots(): Slot[] {
+  return Array.from({ length: STASH_DEFAULT_ROWS }, emptySlot)
+}
+
 export function createCharacter(overrides: Partial<Character> = {}): Character {
   return {
+    kind: 'character',
     name: '',
     level: 1,
     xp: 0,
@@ -138,6 +154,9 @@ export type Profile = {
   ownerName: string
   /** Epoch millis the sheet was started. Fixes its place in the sidebar. */
   createdAt: number
+  /** GM-only: kept out of the sidebar and send list for everyone else. A UI
+   *  convention, not encryption — room metadata stays readable regardless. */
+  hidden: boolean
   character: Character
 }
 
@@ -147,6 +166,7 @@ export function createProfile(overrides: Partial<Profile> = {}): Profile {
     ownerId: '',
     ownerName: '',
     createdAt: Date.now(),
+    hidden: false,
     character: createCharacter({ name: overrides.ownerName ?? '' }),
     ...overrides,
   }
@@ -169,6 +189,8 @@ export function normalizeProfile(raw: unknown, fallbackId: string): Profile {
     // Sheets written before the sidebar carry no timestamp; treat them as the
     // oldest ones, which is where they belong anyway.
     createdAt: number(input?.createdAt, 0),
+    // Sheets written before this feature carry no flag; treat them as visible.
+    hidden: input?.hidden === true,
     character: normalizeCharacter(input?.character),
   }
 }
@@ -183,7 +205,8 @@ export function normalizeCharacter(raw: unknown): Character {
   if (!raw || typeof raw !== 'object') return base
   const input = raw as Partial<Character> & { armorClass?: unknown }
 
-  const slots: unknown[] = Array.isArray(input.slots) ? input.slots : []
+  const kind: CharacterKind = input.kind === 'stash' ? 'stash' : 'character'
+  const rawSlots: unknown[] = Array.isArray(input.slots) ? input.slots : []
   const abilities = { ...base.abilities }
   if (input.abilities && typeof input.abilities === 'object') {
     for (const key of Object.keys(abilities) as AbilityKey[]) {
@@ -196,6 +219,7 @@ export function normalizeCharacter(raw: unknown): Character {
 
   const max = number(input.hp?.max, base.hp.max)
   return {
+    kind,
     name: text(input.name),
     level: number(input.level, base.level),
     xp: number(input.xp, base.xp),
@@ -204,11 +228,22 @@ export function normalizeCharacter(raw: unknown): Character {
     hp: { max, current: Math.min(number(input.hp?.current, max), max) },
     notes: text(input.notes),
     abilities,
-    slots: Array.from({ length: SLOT_COUNT }, (_, index) =>
-      normalizeSlot(slots[index]),
-    ),
+    slots:
+      kind === 'stash'
+        ? normalizeStashSlots(rawSlots)
+        : Array.from({ length: SLOT_COUNT }, (_, index) =>
+            normalizeSlot(rawSlots[index]),
+          ),
     dead: input.dead === true,
   }
+}
+
+/** A stash's row count is whatever was saved, not a fixed printed grid. An
+ *  empty/missing array (a brand-new stash) still needs somewhere to put the
+ *  first item, hence the small starting size. */
+function normalizeStashSlots(rawSlots: readonly unknown[]): Slot[] {
+  if (rawSlots.length === 0) return emptyStashSlots()
+  return rawSlots.map(normalizeSlot)
 }
 
 /** Rows used to be plain strings, and later had no note. */
@@ -245,6 +280,14 @@ function number(value: unknown, fallback: number): number {
 export function slotCapacity(character: Character): number {
   const base = 10 + character.abilities.odolnost
   return Math.min(SLOT_COUNT, Math.max(1, base))
+}
+
+/**
+ * A stash has no odolnost and no printed cap — its usable rows are simply
+ * how many the GM currently has it holding.
+ */
+export function stashCapacity(character: Character): number {
+  return Math.max(1, character.slots.length)
 }
 
 export function usedSlots(character: Character): number {

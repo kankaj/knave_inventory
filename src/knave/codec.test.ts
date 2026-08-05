@@ -77,6 +77,19 @@ describe('packProfile / unpackProfile', () => {
     expect(unpackProfile(packed, 'key-id').id).toBe('key-id')
   })
 
+  it('survives a hidden stash with a non-default row count, empty rows included', () => {
+    const stash = createProfile({
+      id: 'stash-1',
+      hidden: true,
+      character: createCharacter({ kind: 'stash', slots: emptySlots().slice(0, 9) }),
+    })
+    const restored = unpackProfile(packProfile(stash), 'other-id')
+    expect(restored).toEqual(stash)
+    expect(restored.hidden).toBe(true)
+    expect(restored.character.kind).toBe('stash')
+    expect(restored.character.slots).toHaveLength(9)
+  })
+
   it('ignores rows pointing outside the sheet', () => {
     const packed = packProfile(filled())
     const character = packed.c as Record<string, unknown>

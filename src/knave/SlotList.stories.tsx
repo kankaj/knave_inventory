@@ -94,6 +94,54 @@ function Harness({
   )
 }
 
+function toSlot(item: Row): Slot {
+  if (typeof item === 'string') return { text: item, note: '', wound: false }
+  if ('wound' in item) return { text: item.wound, note: '', wound: true }
+  return { text: item.item, note: item.note, wound: false }
+}
+
+/**
+ * A stash's row count is the array length itself, not a fixed 20-row grid —
+ * so unlike Harness above, this starts from exactly as many rows as given.
+ */
+function StashHarness({ items }: { items: Row[] }) {
+  const [slots, setSlots] = useState<Slot[]>(() => items.map(toSlot))
+
+  return (
+    <SlotList
+      slots={slots}
+      capacity={slots.length}
+      onSlotChange={(index, text) =>
+        setSlots(
+          slots.map((slot, i) => (i === index ? { ...slot, text } : slot)),
+        )
+      }
+      onNoteChange={(index, note) =>
+        setSlots(
+          slots.map((slot, i) => (i === index ? { ...slot, note } : slot)),
+        )
+      }
+      onWoundToggle={(index) =>
+        setSlots(
+          slots.map((slot, i) =>
+            i === index ? { ...slot, wound: !slot.wound } : slot,
+          ),
+        )
+      }
+      onAddRow={() =>
+        setSlots((current) => [
+          ...current,
+          { text: '', note: '', wound: false },
+        ])
+      }
+      onRemoveRow={(index) => {
+        if (slots.length <= 1) return
+        setSlots((current) => current.filter((_, i) => i !== index))
+      }}
+    />
+  )
+}
+
 export const Empty: Story = {
   render: () => <Harness items={[]} capacity={12} />,
   play: async ({ canvas }) => {
@@ -184,6 +232,28 @@ export const PickingItemsToSend: Story = {
     // A wound cannot be handed over, and an empty row has nothing to give.
     await expect(canvas.getByLabelText('Poslat řádek 2')).toBeDisabled()
     await expect(canvas.getByLabelText('Poslat řádek 3')).toBeDisabled()
+  },
+}
+
+/** A stash grows and shrinks by hand instead of a fixed printed grid. */
+export const ResizableRows: Story = {
+  render: () => <StashHarness items={['Meč']} />,
+  play: async ({ canvas }) => {
+    await expect(canvas.getByText('1/1')).toBeVisible()
+    await userEvent.click(canvas.getByRole('button', { name: '+ řádek' }))
+    await expect(canvas.getByText('1/2')).toBeVisible()
+    await expect(canvas.getByLabelText('Odebrat řádek 2')).toBeEnabled()
+    await userEvent.click(canvas.getByLabelText('Odebrat řádek 2'))
+    await expect(canvas.getByText('1/1')).toBeVisible()
+  },
+}
+
+/** The last row can never be removed, and neither can a row still in use. */
+export const ResizableRowFloor: Story = {
+  render: () => <StashHarness items={['Meč']} />,
+  play: async ({ canvas }) => {
+    // Holding the only item on the sheet: disabled either way.
+    await expect(canvas.getByLabelText('Odebrat řádek 1')).toBeDisabled()
   },
 }
 

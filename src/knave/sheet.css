@@ -65,6 +65,14 @@
   min-width: 0;
 }
 
+/* A stash has no left/right split — just notes, the send panel, and the item
+   rows, stacked. */
+.k-sheet-stash {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
 /* ── Name, written where the logo used to be ──────────────── */
 
 .k-namemark {
@@ -127,9 +135,29 @@
 
 /* ── Hexagon field (ŠTÍT) ─────────────────────────────────── */
 
-/* A heraldic shield: flat shoulders, sides running down to a point. */
+/* A heraldic shield: flat top, rounded shoulders, tapering to a point. */
 .k-shield {
-  --shield: polygon(0 0, 100% 0, 100% 55%, 50% 100%, 0 55%);
+  --shield: polygon(
+    14% 0%,
+    86% 0%,
+    94% 1%,
+    99% 6%,
+    100% 14%,
+    100% 26%,
+    100% 48%,
+    97% 62%,
+    90% 76%,
+    76% 90%,
+    50% 100%,
+    24% 90%,
+    10% 76%,
+    3% 62%,
+    0% 48%,
+    0% 26%,
+    0% 14%,
+    1% 6%,
+    6% 1%
+  );
 
   display: flex;
   flex-direction: column;
@@ -142,8 +170,19 @@
   place-items: center;
   width: 48px;
   height: 58px;
-  background: var(--ink);
+  background: var(--shield-ink, var(--ink));
   clip-path: var(--shield);
+  transition: background-color 120ms ease-out;
+}
+
+/* The shield itself lights up while its number is being edited, rather than a
+   rectangle breaking the shape. */
+.k-shield:focus-within {
+  --shield-ink: var(--wax);
+}
+
+.k-shield-input:focus-visible {
+  outline: none;
 }
 
 .k-shield-inner {
@@ -266,6 +305,17 @@
   border: var(--rule-heavy) solid var(--ink);
   border-radius: 50%;
   background: var(--paper-hi);
+  transition: border-color 120ms ease-out;
+}
+
+/* The ring lights up while its number is being edited, rather than a
+   rectangle breaking the circle. */
+.k-dial:focus-within .k-dial-ring {
+  border-color: var(--wax);
+}
+
+.k-dial-value:focus-visible {
+  outline: none;
 }
 
 /* Obrana follows the bonus and is never written down: it is set into the top
@@ -403,6 +453,17 @@
   border: var(--rule-heavy) solid var(--ink);
   border-radius: 6px;
   background: var(--paper-hi);
+  transition: border-color 120ms ease-out;
+}
+
+/* The box lights up while its number is being edited, rather than a
+   rectangle breaking its own border. */
+.k-pennant-max:focus-within {
+  border-color: var(--wax);
+}
+
+.k-pennant-max .k-num-input:focus-visible {
+  outline: none;
 }
 
 .k-pennant-track {
@@ -644,6 +705,59 @@
 .k-slot-wound[aria-pressed='true']::before,
 .k-slot-wound[aria-pressed='true']::after {
   background: var(--wax);
+}
+
+/* ── Resizable rows (stash only) ───────────────────────────── */
+
+.k-slot[data-resizing='true'] {
+  grid-template-columns: 18px minmax(0, 1.1fr) minmax(0, 1fr) auto auto;
+}
+
+.k-slot[data-picking='true'][data-resizing='true'] {
+  grid-template-columns: auto 18px minmax(0, 1.1fr) minmax(0, 1fr) auto auto;
+}
+
+.k-slot-remove {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 auto;
+  padding: 0;
+  border: 1.5px solid var(--ink-soft);
+  border-radius: 3px;
+  background: transparent;
+  color: var(--ink-soft);
+  font: 600 12px/1 'EB Garamond', serif;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.k-slot-remove:hover:not(:disabled) {
+  border-color: var(--wax);
+  background: color-mix(in srgb, var(--wax) 12%, transparent);
+  color: var(--wax);
+}
+
+.k-slot-remove:disabled {
+  opacity: 0.25;
+  cursor: default;
+}
+
+.k-slots-add {
+  width: 100%;
+  padding: 5px 0;
+  border: 0;
+  border-top: var(--rule-hair) solid var(--ink);
+  background: transparent;
+  color: var(--ink-soft);
+  font: 600 11px/1 'EB Garamond', serif;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.k-slots-add:hover {
+  background: color-mix(in srgb, var(--ink) 6%, transparent);
+  color: var(--ink);
 }
 
 /* ── Send panel ───────────────────────────────────────────── */
@@ -972,6 +1086,14 @@
 
 .k-side-toggle {
   font-size: 10px;
+}
+
+/* GM-only controls stay clear of the sidebar toggle on the left. */
+.k-app-bar-end {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
 }
 
 .k-app-notice {

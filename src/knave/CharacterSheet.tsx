@@ -4,7 +4,13 @@ import { HealthPennant } from './HealthPennant'
 import { SendPanel, type SendTarget } from './SendPanel'
 import { SlotList } from './SlotList'
 import { NameMark, NotesField, RibbonField, ShieldField } from './fields'
-import { ABILITIES, slotCapacity, type Character } from './types'
+import {
+  ABILITIES,
+  emptySlot,
+  slotCapacity,
+  stashCapacity,
+  type Character,
+} from './types'
 import './sheet.css'
 
 export type CharacterSheetProps = {
@@ -41,6 +47,75 @@ export function CharacterSheet({
   // Rows emptied by a completed send drop out of the selection on their own.
   const selected = picked.filter(sendable)
   const sending = sendTargets !== undefined && onSend !== undefined
+
+  const onSelectToggle = sending
+    ? (index: number) =>
+        setPicked((current) =>
+          current.includes(index)
+            ? current.filter((item) => item !== index)
+            : [...current, index],
+        )
+    : undefined
+
+  const onSlotChange = (index: number, text: string) => {
+    const slots = character.slots.slice()
+    slots[index] = { ...slots[index], text }
+    patch({ slots })
+  }
+
+  const onNoteChange = (index: number, note: string) => {
+    const slots = character.slots.slice()
+    slots[index] = { ...slots[index], note }
+    patch({ slots })
+  }
+
+  const onWoundToggle = (index: number) => {
+    const slots = character.slots.slice()
+    slots[index] = { ...slots[index], wound: !slots[index].wound }
+    patch({ slots })
+  }
+
+  const sendPanel = sending && (
+    <SendPanel
+      selectedCount={selected.length}
+      targets={sendTargets}
+      notice={sendNotice}
+      onSend={(targetId) => onSend(targetId, selected)}
+    />
+  )
+
+  // A stash is just item rows and a place to jot what they're for — no name,
+  // abilities, level, or health track to render.
+  if (character.kind === 'stash') {
+    return (
+      <div className="k-sheet k-sheet-stash">
+        <div className="k-vitals-side">
+          <NotesField
+            value={character.notes}
+            onChange={(notes) => patch({ notes })}
+          />
+          {sendPanel}
+        </div>
+
+        <SlotList
+          slots={character.slots}
+          capacity={stashCapacity(character)}
+          selected={sending ? selected : undefined}
+          onSelectToggle={onSelectToggle}
+          onSlotChange={onSlotChange}
+          onNoteChange={onNoteChange}
+          onWoundToggle={onWoundToggle}
+          onAddRow={() => patch({ slots: [...character.slots, emptySlot()] })}
+          onRemoveRow={(index) => {
+            if (character.slots.length <= 1) return
+            const slots = character.slots.slice()
+            slots.splice(index, 1)
+            patch({ slots })
+          }}
+        />
+      </div>
+    )
+  }
 
   return (
     <div className="k-sheet" data-dead={character.dead}>
@@ -96,14 +171,7 @@ export function CharacterSheet({
                 onChange={(notes) => patch({ notes })}
               />
 
-              {sending && (
-                <SendPanel
-                  selectedCount={selected.length}
-                  targets={sendTargets}
-                  notice={sendNotice}
-                  onSend={(targetId) => onSend(targetId, selected)}
-                />
-              )}
+              {sendPanel}
             </div>
           </div>
         </div>
@@ -120,31 +188,10 @@ export function CharacterSheet({
             slots={character.slots}
             capacity={slotCapacity(character)}
             selected={sending ? selected : undefined}
-            onSelectToggle={
-              sending
-                ? (index) =>
-                    setPicked((current) =>
-                      current.includes(index)
-                        ? current.filter((item) => item !== index)
-                        : [...current, index],
-                    )
-                : undefined
-            }
-            onSlotChange={(index, text) => {
-              const slots = character.slots.slice()
-              slots[index] = { ...slots[index], text }
-              patch({ slots })
-            }}
-            onNoteChange={(index, note) => {
-              const slots = character.slots.slice()
-              slots[index] = { ...slots[index], note }
-              patch({ slots })
-            }}
-            onWoundToggle={(index) => {
-              const slots = character.slots.slice()
-              slots[index] = { ...slots[index], wound: !slots[index].wound }
-              patch({ slots })
-            }}
+            onSelectToggle={onSelectToggle}
+            onSlotChange={onSlotChange}
+            onNoteChange={onNoteChange}
+            onWoundToggle={onWoundToggle}
           />
         </div>
       </div>

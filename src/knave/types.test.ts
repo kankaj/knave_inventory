@@ -3,11 +3,13 @@ import {
   ABILITY_MAX,
   ABILITY_MIN,
   SLOT_COUNT,
+  STASH_DEFAULT_ROWS,
   abilityDefense,
   createCharacter,
   normalizeCharacter,
   normalizeProfile,
   slotCapacity,
+  stashCapacity,
   usedSlots,
 } from './types'
 
@@ -69,6 +71,26 @@ describe('normalizeCharacter', () => {
     }
   })
 
+  it('defaults kind to character, and only trusts stash exactly', () => {
+    expect(normalizeCharacter({}).kind).toBe('character')
+    expect(normalizeCharacter({ kind: 'npc' }).kind).toBe('character')
+    expect(normalizeCharacter({ kind: 'stash' }).kind).toBe('stash')
+  })
+
+  it('gives a fresh stash a small starting row count, not SLOT_COUNT', () => {
+    const stash = normalizeCharacter({ kind: 'stash' })
+    expect(stash.slots).toHaveLength(STASH_DEFAULT_ROWS)
+  })
+
+  it('keeps a stash at whatever row count it was saved with, un-padded', () => {
+    const stash = normalizeCharacter({
+      kind: 'stash',
+      slots: [{ text: 'Meč' }, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}],
+    })
+    expect(stash.slots).toHaveLength(12)
+    expect(stash.slots[0].text).toBe('Meč')
+  })
+
   it('drops non-numeric ability values', () => {
     const character = normalizeCharacter({
       abilities: { sila: 3, obratnost: 'dvě', odolnost: Number.NaN },
@@ -105,6 +127,12 @@ describe('normalizeProfile', () => {
   it('rebuilds a usable profile from nothing', () => {
     expect(normalizeProfile(undefined, 'key-id').id).toBe('key-id')
   })
+
+  it('defaults hidden to false and only trusts a real true', () => {
+    expect(normalizeProfile({}, 'key-id').hidden).toBe(false)
+    expect(normalizeProfile({ hidden: 'ano' }, 'key-id').hidden).toBe(false)
+    expect(normalizeProfile({ hidden: true }, 'key-id').hidden).toBe(true)
+  })
 })
 
 describe('abilityDefense', () => {
@@ -130,6 +158,22 @@ describe('slotCapacity', () => {
     const frail = createCharacter()
     frail.abilities.odolnost = -20
     expect(slotCapacity(frail)).toBe(1)
+  })
+})
+
+describe('stashCapacity', () => {
+  it('follows the current row count, ignoring abilities', () => {
+    const stash = createCharacter({ kind: 'stash' })
+    stash.abilities.odolnost = 99
+    expect(stashCapacity(stash)).toBe(stash.slots.length)
+
+    stash.slots = [...stash.slots, ...stash.slots]
+    expect(stashCapacity(stash)).toBe(stash.slots.length)
+  })
+
+  it('never drops below one row', () => {
+    const stash = createCharacter({ kind: 'stash', slots: [] })
+    expect(stashCapacity(stash)).toBe(1)
   })
 })
 

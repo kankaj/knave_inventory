@@ -16,7 +16,14 @@ import {
 import { chooseProfile } from './identity'
 import { compareProfiles } from './ordering'
 import { sendItems, type SendResult } from './transfer'
-import { createProfile, type Character, type Profile } from './types'
+import {
+  createCharacter,
+  createProfile,
+  emptyStashSlots,
+  type Character,
+  type Profile,
+} from './types'
+import { isVisibleToViewer } from './visibility'
 
 /**
  * One room-metadata key per profile. Owlbear merges metadata by top-level key,
@@ -265,6 +272,34 @@ export function useProfiles() {
     return profile.id
   }, [roomId, self, writeProfile])
 
+  /**
+   * A room-wide loot container, not owned by anyone. Leaving `ownerId` empty
+   * matters: `chooseProfile`'s "owned" tier matches on player id, and giving
+   * the stash the GM's id would risk it being auto-selected as their own
+   * sheet on the next reconnect instead of their actual character.
+   */
+  const addStashProfile = useCallback(async () => {
+    const profile = createProfile({
+      hidden: true,
+      character: createCharacter({
+        kind: 'stash',
+        name: 'Předměty',
+        slots: emptyStashSlots(),
+      }),
+    })
+    await writeProfile(profile)
+    return profile.id
+  }, [writeProfile])
+
+  const toggleHidden = useCallback(
+    async (profileId: string) => {
+      const profile = profiles[profileId]
+      if (!profile) return
+      await writeProfile({ ...profile, hidden: !profile.hidden })
+    },
+    [profiles, writeProfile],
+  )
+
   // A room that came back empty gets its sheets pushed back from this browser's
   // snapshot, before anybody starts a fresh sheet on top of the loss.
   useEffect(() => {
@@ -391,28 +426,32 @@ export function useProfiles() {
     [writeProfiles],
   )
 
+  const isGM = self?.role === 'GM'
+
   const entries: ProfileEntry[] = useMemo(() => {
-    const list = Object.values(profiles).map((profile) => {
-      const owner = players.find((player) => player.id === profile.ownerId)
-      const isSelf = self !== undefined && profile.ownerId === self.id
-      const connected = isSelf || owner !== undefined
-      return {
-        profile,
-        displayName:
-          profile.character.name ||
-          profile.ownerName ||
-          owner?.name ||
-          'Nový list',
-        color: isSelf
-          ? (self?.color ?? OFFLINE_COLOR)
-          : (owner?.color ?? OFFLINE_COLOR),
-        connected,
-        isSelf,
-      }
-    })
+    const list = Object.values(profiles)
+      .filter((profile) => isVisibleToViewer(profile, isGM))
+      .map((profile) => {
+        const owner = players.find((player) => player.id === profile.ownerId)
+        const isSelf = self !== undefined && profile.ownerId === self.id
+        const connected = isSelf || owner !== undefined
+        return {
+          profile,
+          displayName:
+            profile.character.name ||
+            profile.ownerName ||
+            owner?.name ||
+            'Nový list',
+          color: isSelf
+            ? (self?.color ?? OFFLINE_COLOR)
+            : (owner?.color ?? OFFLINE_COLOR),
+          connected,
+          isSelf,
+        }
+      })
     // Grouped by owner, oldest sheet of each owner on top.
     return list.sort(compareProfiles)
-  }, [players, profiles, self])
+  }, [isGM, players, profiles, self])
 
   const selfProfileId =
     entries.find((entry) => entry.isSelf)?.profile.id ?? entries[0]?.profile.id
@@ -425,9 +464,12 @@ export function useProfiles() {
     loaded,
     notice,
     dismissNotice,
+    isGM,
     updateCharacter,
     claimProfile,
     addProfile,
+    addStashProfile,
+    toggleHidden,
     deleteProfile,
     sendBetween,
     exportProfiles,

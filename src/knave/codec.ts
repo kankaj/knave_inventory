@@ -1,11 +1,13 @@
 import {
   ABILITIES,
   SLOT_COUNT,
+  STASH_DEFAULT_ROWS,
   createCharacter,
   emptySlot,
   normalizeProfile,
   type AbilityKey,
   type Character,
+  type CharacterKind,
   type Profile,
   type Slot,
 } from './types'
@@ -40,6 +42,7 @@ export function packProfile(profile: Profile): Packed {
   if (profile.ownerId) packed.o = profile.ownerId
   if (profile.ownerName) packed.n = profile.ownerName
   if (profile.createdAt) packed.t = profile.createdAt
+  if (profile.hidden) packed.h = 1
   const character = packCharacter(profile.character)
   if (Object.keys(character).length > 0) packed.c = character
   return packed
@@ -48,6 +51,7 @@ export function packProfile(profile: Profile): Packed {
 function packCharacter(character: Character): Packed {
   const base = createCharacter()
   const packed: Packed = {}
+  if (character.kind !== base.kind) packed.k = character.kind
   if (character.name) packed.n = character.name
   if (character.level !== base.level) packed.l = character.level
   if (character.xp !== base.xp) packed.x = character.xp
@@ -73,6 +77,9 @@ function packCharacter(character: Character): Packed {
     slots.push([index, slot.text, slot.note, slot.wound ? 1 : 0])
   })
   if (slots.length > 0) packed.q = slots
+  // A stash's row count is meaningful even when every row is empty, unlike a
+  // character's fixed 20 — so it has to be stored explicitly.
+  if (character.kind === 'stash') packed.qn = character.slots.length
 
   return packed
 }
@@ -92,6 +99,7 @@ export function unpackProfile(raw: unknown, fallbackId: string): Profile {
     ownerId: string(input.o),
     ownerName: string(input.n),
     createdAt: number(input.t, 0),
+    hidden: input.h === 1 || input.h === true,
     character: unpackCharacter(input.c),
   }
 }
@@ -100,6 +108,8 @@ function unpackCharacter(raw: unknown): Character {
   const base = createCharacter()
   if (!raw || typeof raw !== 'object') return base
   const input = raw as Packed
+
+  const kind: CharacterKind = input.k === 'stash' ? 'stash' : 'character'
 
   const abilities = { ...base.abilities }
   if (Array.isArray(input.a)) {
@@ -115,22 +125,14 @@ function unpackCharacter(raw: unknown): Character {
   const hp = Array.isArray(input.h) ? (input.h as unknown[]) : []
   const max = number(hp[1], base.hp.max)
 
-  const slots: Slot[] = Array.from({ length: SLOT_COUNT }, emptySlot)
-  if (Array.isArray(input.q)) {
-    for (const entry of input.q as unknown[]) {
-      if (!Array.isArray(entry)) continue
-      const [index, text, note, wound] = entry as unknown[]
-      if (typeof index !== 'number') continue
-      if (index < 0 || index >= SLOT_COUNT) continue
-      slots[index] = {
-        text: string(text),
-        note: string(note),
-        wound: wound === 1 || wound === true,
-      }
-    }
-  }
+  // A character always has SLOT_COUNT rows; a stash has whatever row count
+  // was saved (meaningful even when every row is empty), or a fresh default.
+  const length =
+    kind === 'stash' ? positiveInt(input.qn, STASH_DEFAULT_ROWS) : SLOT_COUNT
+  const slots = unpackSlots(length, input.q)
 
   return {
+    kind,
     name: string(input.n),
     level: number(input.l, base.level),
     xp: number(input.x, base.xp),
@@ -141,6 +143,29 @@ function unpackCharacter(raw: unknown): Character {
     slots,
     dead: input.d === 1 || input.d === true,
   }
+}
+
+function unpackSlots(length: number, packedSlots: unknown): Slot[] {
+  const slots: Slot[] = Array.from({ length }, emptySlot)
+  if (!Array.isArray(packedSlots)) return slots
+  for (const entry of packedSlots as unknown[]) {
+    if (!Array.isArray(entry)) continue
+    const [index, text, note, wound] = entry as unknown[]
+    if (typeof index !== 'number') continue
+    if (index < 0 || index >= length) continue
+    slots[index] = {
+      text: string(text),
+      note: string(note),
+      wound: wound === 1 || wound === true,
+    }
+  }
+  return slots
+}
+
+function positiveInt(value: unknown, fallback: number): number {
+  return typeof value === 'number' && Number.isFinite(value) && value > 0
+    ? Math.round(value)
+    : fallback
 }
 
 /** Byte length the value takes up in room metadata. */

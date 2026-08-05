@@ -9,6 +9,9 @@ import type { Profile } from './types'
  */
 const BACKUP_PREFIX = 'knave-inventory/backup/'
 
+/** When the table last downloaded a portable backup of this room, per browser. */
+const BACKUP_STAMP_PREFIX = 'knave-inventory/backup-stamp/'
+
 /** The stored snapshot. Profiles are kept packed, same as in the room. */
 export type Snapshot = {
   savedAt: number
@@ -17,6 +20,36 @@ export type Snapshot = {
 
 function backupKey(roomId: string): string {
   return `${BACKUP_PREFIX}${roomId}`
+}
+
+function backupStampKey(roomId: string): string {
+  return `${BACKUP_STAMP_PREFIX}${roomId}`
+}
+
+/**
+ * The room snapshot above only survives the room itself: deleting the room
+ * deletes its metadata with it, and a fresh room gets a fresh id the snapshot
+ * never matches. A portable export file is the only copy that outlives the
+ * room, so the GM is reminded to take one until they actually do.
+ */
+export function recordBackupExport(roomId: string) {
+  if (!roomId) return
+  try {
+    localStorage.setItem(backupStampKey(roomId), String(Date.now()))
+  } catch {
+    // Losing the stamp only means the reminder keeps showing, which is safe.
+  }
+}
+
+export function lastBackupExportAt(roomId: string): number {
+  if (!roomId) return 0
+  try {
+    const raw = localStorage.getItem(backupStampKey(roomId))
+    const parsed = raw ? Number(raw) : 0
+    return Number.isFinite(parsed) ? parsed : 0
+  } catch {
+    return 0
+  }
 }
 
 export function saveSnapshot(roomId: string, profiles: readonly Profile[]) {

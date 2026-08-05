@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import OBR from '@owlbear-rodeo/sdk'
 import { CharacterSheet } from './knave/CharacterSheet'
 import { ProfileSidebar } from './knave/ProfileSidebar'
+import { lastBackupExportAt, recordBackupExport } from './knave/backup'
 import { useProfiles } from './knave/storage'
 import { freeRows } from './knave/transfer'
 import './knave/sheet.css'
@@ -32,6 +33,9 @@ function App() {
 /** Remembers whether the column was left open, per browser. */
 const SIDEBAR_KEY = 'knave-inventory/sidebar-open'
 
+/** How stale a portable backup can get before the GM is nudged again. */
+const BACKUP_NUDGE_DAYS = 7
+
 function recallSidebar(): boolean {
   try {
     return localStorage.getItem(SIDEBAR_KEY) !== 'closed'
@@ -48,9 +52,12 @@ function Room() {
     loaded,
     notice,
     dismissNotice,
+    isGM,
     updateCharacter,
     claimProfile,
     addProfile,
+    addStashProfile,
+    toggleHidden,
     deleteProfile,
     sendBetween,
     exportProfiles,
@@ -59,6 +66,12 @@ function Room() {
   const [selectedId, setSelectedId] = useState('')
   const [sendNotice, setSendNotice] = useState('')
   const [sidebarOpen, setSidebarOpen] = useState(recallSidebar)
+  // A room survives forever, but deleting it takes its metadata with it, and a
+  // fresh room won't match this stamp — only a downloaded file outlives the
+  // room itself. Tracked per browser, so the reminder follows whoever GMs.
+  const [backupStamp, setBackupStamp] = useState(() =>
+    lastBackupExportAt(OBR.room.id),
+  )
 
   const toggleSidebar = () => {
     setSidebarOpen((open) => {
@@ -104,6 +117,25 @@ function Room() {
     link.download = `knave-deniky-${OBR.room.id}.json`
     link.click()
     URL.revokeObjectURL(url)
+    recordBackupExport(OBR.room.id)
+    setBackupStamp(Date.now())
+  }
+
+  const daysSinceBackup = backupStamp
+    ? (Date.now() - backupStamp) / 86_400_000
+    : Infinity
+  const backupOverdue = isGM && daysSinceBackup > BACKUP_NUDGE_DAYS
+
+  // One stash per room: open it if it already exists, otherwise start it.
+  const openStash = () => {
+    const existing = entries.find(
+      (entry) => entry.profile.character.kind === 'stash',
+    )
+    if (existing) {
+      setSelectedId(existing.profile.id)
+    } else {
+      void addStashProfile().then((id) => id && setSelectedId(id))
+    }
   }
 
   return (
@@ -141,7 +173,50 @@ function Room() {
               ☰ deníky
             </button>
           )}
+
+          {isGM && (
+            <span className="k-app-bar-end">
+              <button
+                type="button"
+                className="k-app-action"
+                onClick={openStash}
+                title="Otevřít sklad předmětů — jen pro GM"
+              >
+                Předměty
+              </button>
+              <button
+                type="button"
+                className="k-app-action"
+                aria-pressed={active.profile.hidden}
+                onClick={() => void toggleHidden(active.profile.id)}
+                title={
+                  active.profile.hidden
+                    ? 'Odkrýt tento deník hráčům'
+                    : 'Skrýt tento deník před hráči — zmizí ze seznamu, ale není to zámek na datech.'
+                }
+              >
+                {active.profile.hidden ? '🙈 Skryto' : '👁 Viditelné'}
+              </button>
+            </span>
+          )}
         </div>
+
+        {backupOverdue && (
+          <p className="k-app-notice" role="status">
+            <span>
+              {backupStamp
+                ? 'Poslední záloha deníků je starší týdne. Místnost přežije restart, ale ne svoje smazání.'
+                : 'Ještě sis nestáhl zálohu deníků. Místnost přežije restart, ale ne svoje smazání.'}
+            </span>
+            <button
+              type="button"
+              className="k-app-action"
+              onClick={downloadBackup}
+            >
+              Stáhnout zálohu
+            </button>
+          </p>
+        )}
 
         {notice && (
           <p className="k-app-notice" role="status">
